@@ -1,4 +1,5 @@
 {
+  "maroc": {
     "OTABG_ON": "1,1,1,1",
     "DAC_ON": "1,1,1,1",
     "SMALL_DAC": "0,0,0,0",
@@ -297,7 +298,15 @@
     "MASKOR2_60": "0,0,0,0",
     "MASKOR2_61": "0,0,0,0",
     "MASKOR2_62": "0,0,0,0",
-    "MASKOR2_63": "0,0,0,0",
+    "MASKOR2_63": "0,0,0,0"
+  },
+  "hv": {
+    "HV_0": 49000,
+    "HV_1": 49000,
+    "HV_2": 49000,
+    "HV_3": 49000
+  },
+  "chanmask": {
     "CHANMASK_0": "0xffffffff",
     "CHANMASK_1": "0xffffffff",
     "CHANMASK_2": "0xffffffff",
@@ -308,4 +317,18 @@
     "CHANMASK_7": "0xffffffff",
     "CHANMASK_8": "0x155",
     "GOEMASK": "0x3"
+  },
+  "acq": {
+    "ACQMODE": 0,
+    "ACQINT": 9,
+    "HOLD1": 0,
+    "HOLD2": 0,
+    "MONCHAN": 69,
+    "STIMON": 0,
+    "STIM_LEVEL": 255,
+    "STIM_RATE": 0,
+    "FLASH_LEVEL": 0,
+    "FLASH_RATE": 7,
+    "FLASH_WIDTH": 15
   }
+}
