@@ -8,12 +8,21 @@ import json
 import socket
 import time
 
-"""
-util class
-"""
 class Util(object):
+    """
+    Description:
+        The Util class is used to store some utility functions.
+    """
     @staticmethod
     def ip_addr_str_to_bytes(ip_addr_str):
+        """
+        Description:
+            convert the ip address string to bytes.
+        Inputs:
+            - ip_addr_str(str): the ip address string.
+        Outputs:
+            - bytes(bytearray): the ip address bytes.
+        """
         pieces = ip_addr_str.strip().split('.')
         if len(pieces) != 4:
             raise Exception('bad IP addr %s'%ip_addr_str)
@@ -27,6 +36,15 @@ class Util(object):
 
     @staticmethod
     def reverse_bits(data_in, width):
+        """
+        Description:
+            reverse the bits of the data.
+        Inputs:
+            - data_in(int): the input data.
+            - width(int): the width of the data.
+        Outputs:
+            - data_out(int): the output data.
+        """
         data_out = 0
         for ii in range(width):
             data_out = data_out << 1
@@ -35,7 +53,54 @@ class Util(object):
         return data_out
 
 
-class DAQ_PARAMS:
+class PktTR(object):
+    """
+    Description:
+        The PktRecv class is used to receive the packets from the quabo.
+    """
+    def __init__(self, ip_addr, port):
+        """
+        Description:
+            The constructor of PktRecv class.
+        Inputs:
+            - ip_addr(str): the ip address of the quabo.
+            - port(int): the port number.
+        """
+        self.ip_addr = ip_addr
+        self.port = port
+        self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        self.sock.bind((self.ip_addr, self.port))
+        self.sock.settimeout(0.5)
+
+    def recv(self):
+        """
+        Description:
+            receive the packets from the quabo.
+        Outputs:
+            - data(bytearray): the received data.
+        """
+        try:
+            data, addr = self.sock.recvfrom(2048)
+            return data
+        except:
+            return None
+    def send(self, data):
+        """
+        Description:
+            send the data to the quabo.
+        Inputs:
+            - data(bytearray): the data to be sent.
+        """
+        self.sock.sendto(bytes(data), (self.ip_addr, self.port))
+
+    def close(self):
+        """
+        Description:
+            close the socket.
+        """
+        self.sock.close()
+
+class DAQ_PARAMS(object):
     """
     Description:
         The DAQ_PARAMS class is used to store the daq parameters.
@@ -89,16 +154,13 @@ class DAQ_PARAMS:
         self.stim_rate = rate
         self.stim_level = level
         
-class QuaboConfig:
+class QuaboConfig(PktTR):
     """
     Description:
         The QuaboConfig class is used to configure the quabo, incuding setting the high voltage, sending the acquisition parameters, etc.
     """
-    # define constants
     PORTS = {
-        'CMD'   : 60000,
-        'DATA' : 60001,
-        'HK'    : 60002
+        'CMD'   : 60000
     }
     SERIAL_COMMAND_LENGTH = 829
     ACQ_MODE = {
@@ -126,9 +188,6 @@ class QuaboConfig:
         self.quabo_config_file = quabo_config_file
         with open(self.quabo_config_file) as f:
             self.quabo_config = json.load(f)
-        # default HV values are all 0.
-        # the values will change when we call hv_config or set_hv_chan.
-        self.have_hk_sock = False
 
         self.shutter_open = 0
         self.shutter_power = 0
@@ -183,7 +242,7 @@ class QuaboConfig:
         """
         self.sock.close()
 
-    def daq_params_config(self, params):
+    def DaqParamsConfig(self, params):
         """
         Description:
             send the daq parameters to the quabo.
@@ -214,7 +273,7 @@ class QuaboConfig:
             cmd[18] = params.stim_rate
         self.send(cmd)
 
-    def ph_packet_dest_config(self, dest_str):
+    def PhPktDestConfig(self, dest_str):
         """
         Description:
             configure the destination IP addr for PH packets.
@@ -223,7 +282,7 @@ class QuaboConfig:
         """
         self.quabo_config['ips']['PH'] = dest_str
     
-    def moive_packet_dest_config(self, dest_str):
+    def MoivePktDestConfig(self, dest_str):
         """
         Description:
             configure the destination IP addr for Moive packets.
@@ -232,7 +291,7 @@ class QuaboConfig:
         """
         self.quabo_config['ips']['MOIVE'] = dest_str
 
-    def set_data_packet_dest(self):
+    def SetDataPktDest(self):
         """
         Description:
             set destination IP addr for both PH and Moive packets.
@@ -259,7 +318,7 @@ class QuaboConfig:
         if count != 12:
             return
 
-    def hk_packet_dest_config(self, dest_str):
+    def HkPacketDestConfig(self, dest_str):
         """
         Description:
             configure the destination IP addr for HK packets.
@@ -268,7 +327,7 @@ class QuaboConfig:
         """
         self.quabo_config['ips']['HK'] = dest_str   
 
-    def set_hk_packet_dest(self, dest_str):
+    def SetHkPacketDest(self, dest_str):
         """
         Description:
             set destination IP addr for HK packets.
@@ -435,7 +494,7 @@ class QuaboConfig:
                 cmd[ii+260] = self.MAROC_regs[2][ii]
                 cmd[ii+388] = self.MAROC_regs[3][ii]
 
-    def set_maroc_params(self):
+    def SetMarocParams(self):
         """
         Description:
             send the maroc parameters to the quabo.
@@ -445,7 +504,7 @@ class QuaboConfig:
         self._make_maroc_cmd(maroc_config, cmd)
         self.send(cmd)
 
-    def maroc_param_config(self, tag, vals):
+    def MarocParamConfig(self, tag, vals):
         """
         Description:
             set the maroc parameters.
@@ -455,7 +514,7 @@ class QuaboConfig:
         """
         self.quabo_config['maroc'][tag] = vals
 
-    def set_hv(self, chan = 0b1111):
+    def SetHv(self, chan = 0b1111):
         """
         Description: 
             config the high voltage for the enabled channels.
@@ -475,7 +534,7 @@ class QuaboConfig:
         self.flush_rx_buf()
         self.send(cmd)
 
-    def hv_config(self, chan, value):
+    def HvConfig(self, chan, value):
         """"
         Description:
             set the high voltage for a specific channel.
@@ -500,7 +559,7 @@ class QuaboConfig:
                 for j in range(4): 
                     cmd[4+ch*4+j] = (val>>j*8) & 0xff 
 
-    def set_trigger_mask(self):
+    def SetTriggerMask(self):
         """"
         Description:
             send the trigger mask parameters to the quabo.
@@ -510,7 +569,7 @@ class QuaboConfig:
         self.flush_rx_buf()
         self.send(cmd)
 
-    def trigger_mask_config(self, chan, value):
+    def TriggerMaskConfig(self, chan, value):
         """
         Description:
             set the trigger mask parameters.
@@ -532,7 +591,7 @@ class QuaboConfig:
             if(tag == 'GOEMASK'):
                 cmd[4] = val & 0x03
 
-    def set_goe_mask(self):
+    def SetGoeMask(self):
         """
         Description:
             send the goe mask parameters to the quabo.
@@ -542,7 +601,7 @@ class QuaboConfig:
         self.flush_rx_buf()
         self.send(cmd)
 
-    def goe_mask_config(self, value):
+    def GoeMaskConfig(self, value):
         """
         Description:
             set the goe mask parameters.
@@ -592,7 +651,7 @@ class QuaboConfig:
         cmd[26] = acq['FLASH_WIDTH'] & 0x0f
         cmd[27] = 0
 
-    def set_acq_parameters(self):
+    def AetAcqParams(self):
         """"
         Description:
             send the acquisition parameters to the quabo.
@@ -602,7 +661,7 @@ class QuaboConfig:
         self.flush_rx_buf()
         self.send(cmd)
 
-    def acq_parameters_config(self, key, value):
+    def AcqParamsConfig(self, key, value):
         """
         Description:
             set the acquisition parameters.
@@ -612,7 +671,7 @@ class QuaboConfig:
         """
         self.quabo_config['acq'][key] = value
         
-    def reset(self):
+    def Reset(self):
         """"
         Description:
             reset the quabo.
@@ -622,7 +681,7 @@ class QuaboConfig:
         cmd = self.make_cmd(0x04)
         self.send(cmd)
 
-    def set_focus(self, steps):
+    def SetFocus(self, steps):
         """
         Description:
             set the focus steps.
@@ -652,7 +711,7 @@ class QuaboConfig:
         cmd[17] = (step_offtime>>8) & 0xff
         self.send(cmd)
 
-    def set_shutter(self, closed):
+    def SetShutter(self, closed):
         """
         Description:
             set the shutter.
@@ -674,7 +733,7 @@ class QuaboConfig:
         cmd[8] = self.fanspeed
         self.send(cmd)
 
-    def set_fan(self, fanspeed):     # fanspeed is 0..15
+    def SetFan(self, fanspeed):     # fanspeed is 0..15
         """"
         Description:
             set the fan speed.
@@ -691,7 +750,7 @@ class QuaboConfig:
         time.sleep(1)
         self.flush_rx_buf()
 
-    def set_shutter_new(self, closed):
+    def SetShutterNew(self, closed):
         """"
         Description:
             open or close the shutter.
@@ -702,7 +761,7 @@ class QuaboConfig:
         cmd[1] = 0x01 if closed else 0x0
         self.send(cmd)
 
-    def set_led_falsher(self, val):
+    def SetLedFalsher(self, val):
         """"
         Description:
             set the led flasher.
@@ -713,7 +772,7 @@ class QuaboConfig:
         cmd[1] = 0x01 if val else 0x0
         self.send(cmd)
 
-    def calibrate_ph_baseline(self):
+    def CalPhBaseline(self):
         """
         Description:
             calibrate the pulse height baseline.
@@ -730,7 +789,7 @@ class QuaboConfig:
             x.append(val)
         return x
 
-    def write_ips_config(self, config_file='quabo_config.json'):
+    def WriteIPsConfig(self, config_file='quabo_config.json'):
         """
         Description:
             write the ip config to the config file.
@@ -745,8 +804,8 @@ class QuaboConfig:
         cfg['ips'] = self.quabo_config['ips']
         with open(config_file, 'w') as f:
             json.dump(cfg, f, indent=2)
-             
-    def write_maroc_config(self, config_file='quabo_config.json'):
+
+    def WriteMarocConfig(self, config_file='quabo_config.json'):
         """
         Description:
             write the maroc config to the config file.
@@ -762,7 +821,7 @@ class QuaboConfig:
         with open(config_file, 'w') as f:
             json.dump(cfg, f, indent=2)
     
-    def write_mask_config(self,  config_file='quabo_config.json'):
+    def WriteMaskConfig(self,  config_file='quabo_config.json'):
         """
         Description:
             write the trigger mask config to the config file.
@@ -779,6 +838,40 @@ class QuaboConfig:
         with open(config_file, 'w') as f:
             json.dump(cfg, f, indent=2)
 
-
-
+class HKRecv(PktRecv):
+    """
+    Description:
+        The HKRecv class is used to receive the housekeeping packets from the quabo.
+    """
+    PORTS = {
+        'HK' : 60002
+    }
+    def __init__(self, ip_addr):
+        """
+        Description:
+            The constructor of HKRecv class.
+        Inputs:
+            - ip_addr(str): the ip address of the quabo.
+        """
+        super().__init__(ip_addr, HKRecv.PORTS['HK'])
+    
+    def FirmwareVersion(self):
+        pass
+class DataRecv(PktRecv):
+    """
+    Description:
+        The DataRecv class is used to receive the data packets from the quabo.
+    """
+    PORTS = {
+        'DATA' : 60001
+    }
+    def __init__(self, ip_addr, port):
+        """
+        Description:
+            The constructor of DataRecv class.
+        Inputs:
+            - ip_addr(str): the ip address of the quabo.
+            - port(int): the port number.
+        """
+        super().__init__(ip_addr, port)
 
