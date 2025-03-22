@@ -8,6 +8,187 @@ import json
 import socket
 import time
 
+import tftpy
+import struct
+import os
+
+class tftpw(object):
+    """
+    Description:
+        The tftpw class is used to reboot quabos, and upload/download golden/silver firmware and wprc filesys.
+    """
+    def __init__(self,ip,port=69):
+        self.client = tftpy.TftpClient(ip,port)
+    
+    def help(self):
+        """
+        Description:
+            print the help information.
+        """
+        print('Help Information:')
+        print('  get_flashid()           : get flash id from flash chip, and the flash id are 8 bytes.')
+        print('  get_wrpc_filesys()      : get wrpc file system from flash chip. [ default space : 0x00E00000--0x00F0FFFF]')
+        print('  get_mb_file()           : get mb file from flash chip. [default space : 0x00F10000--0x0100FFFF]')
+        print('  put_wrpc_filesys(file)  : put file to wrpc filesys space. [default space : 0x00E00000--0x00F0FFFF]')
+        print('  put_mb_file(file)       : put file to mb file space. [default space : 0x00F10000--0x0100FFFF]')
+        print('  put_bin_file(file)      : put fpga bin file to flash chip. [default from 0x01010000]')
+        print('  reboot()                : reboot fpga. [default from 0x01010000]')
+    
+    def get_flashuid(self,filename='flashuid'):
+        """
+        Description:
+            get flash device ID from flash chip.
+        Inputs:
+            - filename(str): the file name to save flash device ID.
+        """
+        self.client.download('/flashuid',filename)
+        print('Get flash Device ID successfully!')
+        
+    def get_wrpc_filesys(self, filename='wrpc_filesys',addr=0x00e00000):
+        """
+        Description:
+            get wrpc file system from flash chip.
+            space - 0x00E00000--0x00F0FFFF
+            size  - 1MB + 64K BYTES = 1114112 BYTES
+        Inputs:
+            - filename(str): the file name to save wrpc file system.
+            - addr(int): the start address to read wrpc file system from flash chip.
+        """
+        fp_w = open(filename,'wb')
+        # we can get 65535 bytes each time, so we need to repeat the download operation for 16 times
+        # for convenience, we read 32768 bytes each time
+        for i in range(0,34):
+            addr_tmp = addr + i*0x8000 
+            offset = str(hex(addr_tmp))
+            remote_filename = '/flash.' + offset[2:] + '.8000'
+            # print('remote_filename :',remote_filename)
+            # download the file to 'tmp'
+            self.client.download(remote_filename,'tmp')
+            # open 'tmp'
+            fp_r = open('tmp','rb')
+            # read data out
+            data = fp_r.read()
+            # write the data to the final file
+            fp_w.write(data)
+            # close 'tmp'
+            fp_r.close()
+        fp_r.close()
+        fp_w.close()
+        os.remove('tmp')
+        print('Download wrpc file system successfully!')
+        
+    def get_mb_file(self, filename='mb_file',addr=0x00F10000):
+        """
+        Description:
+            get mb file from flash chip.
+            space - 0x00F10000--0x0100FFFF
+            size  - 1MB = 1048576 BYTES
+        Inputs:
+            - filename(str): the file name to save mb file.
+            - addr(int): the start address to read mb file from flash chip.
+        """
+        fp_w = open(filename,'wb')
+        # we can get 65535 bytes each time, so we need to repeat the download operation for 16 times
+        # for convenience, we read 32768 bytes each time
+        for i in range(0,32):
+            addr_tmp = addr + i*0x8000 
+            offset = str(hex(addr_tmp))
+            remote_filename = '/flash.' + offset[2:] + '.8000'
+            # print('remote_filename :',remote_filename)
+            # download the file to 'tmp'
+            self.client.download(remote_filename,'tmp')
+            # open 'tmp'
+            fp_r = open('tmp','rb')
+            # read data out
+            data = fp_r.read()
+            # write the data to the final file
+            fp_w.write(data)
+            # close 'tmp'
+            fp_r.close()
+        fp_w.close()
+        os.remove('tmp')
+        print('Download mb file successfully!')
+        
+    def put_wrpc_filesys(self,filename='wrpc_filesys', addr=0x00E00000):
+        """
+        Description:
+            put wrpc file system to flash chip.
+            The memory space starts from 0x00E00000.
+        Inputs:
+            - filename(str): the file name to upload to flash chip.
+            - addr(int): the start address to write wrpc file system to flash chip.
+        """
+        offset = str(hex(addr))
+        remote_filename = '/flash.' + offset[2:]
+        # print('remote_filename  ',remote_filename)
+        size = os.path.getsize(filename)
+        # check the size of wrpc_filesys
+        if size != 0x110000 :
+            print('The size of wrpc_filesys is incorrect, please check it!')
+            return
+        self.client.upload(remote_filename,filename)    
+        print('Upload %s to panoseti wrpc_filesys space successfully!' %filename)
+        
+    def put_mb_file(self,filename='mb_file', addr=0x00F10000):
+        """
+        Description:
+            put mb file to flash chip.
+            The memory space starts from 0x00F10000.
+        Inputs:
+            - filename(str): the file name to upload to flash chip.
+            - addr(int): the start address to write mb file to flash chip.
+        """
+        offset = str(hex(addr))
+        remote_filename = '/flash.' + offset[2:]
+        # print('remote_filename  ',remote_filename)
+        size = os.path.getsize(filename)
+        # check the size of mb_file
+        if size > 0x100000 :
+            print('The size of mb file is too large, and it will mess up other parts on the flash chip!')
+            return
+        self.client.upload(remote_filename,filename)
+        print('Upload %s to panoseti mb_file space successfully!' %filename)
+        
+    def put_bin_file(self,filename,addr=0x01010000):
+        """
+        Description:
+            put fpga bin file to flash chip.
+            The memory space starts from 0x01010000.
+        Inputs:
+            - filename(str): the file name to upload to flash chip.
+            - addr(int): the start address to write bin file to flash chip.
+        """
+        offset = str(hex(addr))
+        remote_filename = '/flash.' + offset[2:]
+        # print('remote_filename :',remote_filename)
+        self.client.upload(remote_filename,filename)
+        print('Upload %s to panoseti bin file space successfully!' %filename)
+        
+    def reboot(self,addr=0x00010100):
+        """
+        Description:
+            reboot fpga.
+        Inputs:
+            - addr(int): the starting address to to get silver firmware.
+                         For the PANOSETI project, it's hard coded to 0x00010100 in the firmware. 
+        """
+        remote_filename = '/progdev'
+        filename = 'tmp.prog'
+        fp = open(filename,'wb')
+        for i in range(1,5):
+            s = struct.pack('B', addr>>(8*(4-i))&0xFF)
+            fp.write(s)
+        fp.close()
+        print('*******************************************************')
+        print('FPGA is rebooting, just ignore the timeout information')
+        print('Wait for 30s, and then check housekeeping data!')
+        print('*******************************************************')
+        try:
+            self.client.upload(remote_filename,filename)
+        except:
+            pass
+        os.remove(filename)
+        
 class Util(object):
     """
     Description:
@@ -53,10 +234,10 @@ class Util(object):
         return data_out
 
 
-class PktTR(object):
+class QuaboSock(object):
     """
     Description:
-        The PktRecv class is used to receive the packets from the quabo.
+        The QuaboSock class is used to receive the packets from the quabo.
     """
     def __init__(self, ip_addr, port):
         """
@@ -72,7 +253,7 @@ class PktTR(object):
         self.sock.bind((self.ip_addr, self.port))
         self.sock.settimeout(0.5)
 
-    def recv(self):
+    def recv(self, len):
         """
         Description:
             receive the packets from the quabo.
@@ -80,10 +261,11 @@ class PktTR(object):
             - data(bytearray): the received data.
         """
         try:
-            data, addr = self.sock.recvfrom(2048)
+            data, addr = self.sock.recvfrom(len)
             return data
         except:
             return None
+        
     def send(self, data):
         """
         Description:
@@ -154,7 +336,7 @@ class DAQ_PARAMS(object):
         self.stim_rate = rate
         self.stim_level = level
         
-class QuaboConfig(PktTR):
+class QuaboConfig(QuaboSock):
     """
     Description:
         The QuaboConfig class is used to configure the quabo, incuding setting the high voltage, sending the acquisition parameters, etc.
@@ -838,7 +1020,7 @@ class QuaboConfig(PktTR):
         with open(config_file, 'w') as f:
             json.dump(cfg, f, indent=2)
 
-class HKRecv(PktRecv):
+class HKRecv(QuaboSock):
     """
     Description:
         The HKRecv class is used to receive the housekeeping packets from the quabo.
@@ -857,7 +1039,8 @@ class HKRecv(PktRecv):
     
     def FirmwareVersion(self):
         pass
-class DataRecv(PktRecv):
+
+class DataRecv(QuaboSock):
     """
     Description:
         The DataRecv class is used to receive the data packets from the quabo.
@@ -875,3 +1058,5 @@ class DataRecv(PktRecv):
         """
         super().__init__(ip_addr, port)
 
+if __name__ == '__main__':
+    pass

@@ -1,0 +1,6 @@
+{
+    "firmware_path": "./firmware",
+    "golden_firmware": "quabo_GOLD.bin",
+    "silver_firmware": "quabo_0207_quabo_0207_28514055.bin",
+    "wrpc_filesys": "wrpc_filesys"
+}
