@@ -7,14 +7,43 @@ The python file contains several class for quabo autotest.
 import json
 import socket
 import time
-
 import tftpy
 import struct
 import os
-
 from ping3 import ping
-
 import logging
+import numpy as np
+
+# The LSBParams describes the map of the code ids to the real settings.
+# All of the info is from the PANOSETI wiki:
+# https://github.com/panoseti/panoseti/wiki/Quabo-packet-interface
+LSBParams = {
+    'hv_setting': -1.14/10**-3,
+    'stim': {
+        'rate': 100*10**6/np.array([19, 18, 17, 16, 15, 14, 13, 12])
+    },
+    'flash': {
+        'rate': np.array([1, 95, 191, 381, 763, 1526, 3052, 6104]),
+        'level': 312/10**-3,
+        'width': 1.5*10 
+    },
+    'hk':{
+        'hvmon': 1.209361*10**-3,
+        'hvimon': 38.147*10**-9,    # (65535-N)*hvimon
+        'v12mon': 9.07*10**-6,
+        'v18mon': 38.14*10**-6,
+        'v33mon': 76.2*10**-6,
+        'v37mon': 76.2*10**-6,
+        'i10mon': 182*10**-6,
+        'i18mon': 37.8*10**-6,
+        'i33mon': 37.8*10**-6,
+        'det_temp': 0.25,
+        'fpga_temp': 1/130.04,      # N*fpga_temp - 273.15
+        'vccintmon': 3/65536,
+        'vccauxmon': 3/65536
+    }
+}
+
 class Util(object):
     """
     Description:
@@ -384,7 +413,8 @@ class QuaboConfig(QuaboSock):
             - ip_config_file(str): the file path of the ip config file.
         """
         # create logger
-        self.logger = logging.getLogger('jasper.dspflow')
+        self.logger = logging.getLogger('QuaboAutoTest.QuaboConfig')
+        self.logger.info('Configure Quabo - %s'%ip_addr)
         # get ip
         self.ip_addr = ip_addr
         # create a socket
@@ -456,28 +486,51 @@ class QuaboConfig(QuaboSock):
         Inputs:
             - params(DAQ_PARAMS): the daq parameters.
         """
+        self.logger.info('DaqParamsConfig')
         cmd = self.make_cmd(0x03)
         mode = 0
         if params.do_image:
             mode |= QuaboConfig.ACQ_MODE['IMAGE']
+            self.logger.debug('16Bit Moive Mode')
         if params.image_8bit:
             mode |= QuaboConfig.ACQ_MODE['IMAGE_8BIT']
+            self.logger.debug('8Bit Moive mode')
         if params.do_ph:
             mode |= QuaboConfig.ACQ_MODE['PULSE_HEIGHT']
+            self.logger.debug('Pulse Height mode')
         if not params.bl_subtract:
             mode |= QuaboConfig.ACQ_MODE['NO_BASELINE_SUBTRACT']
+            self.logger.debug('No baseline subtract')
         cmd[2] = mode
         cmd[4] = params.image_us % 256
         cmd[5] = params.image_us // 256
+        self.logger.debug('Integration time is %d us'% params.image_us)
         cmd[12] = 69
+        # if flash led is enable
         if params.do_flash:
+            self.logger.info('Flash LED is on')
             cmd[22] = params.flash_rate
+            self.logger.debug('Flash rate id is %d'%)
+            self.logger.debug('Flash rate is %d (%d Hz)'%(params.flash_rate, \
+                                                          LSBParams['flash']['rate'][params.flash_rate]))
             cmd[24] = params.flash_level
+            self.logger.debug('Flash level is %d (%d v)'%(params.flash_level, \
+                                                          params.flash_level * LSBParams['flash']['level']))
             cmd[26] = params.flash_width
+            self.logger.debug('Flah widht is %d (%d ns)'%(params.flash_width,\
+                                                          params.flash_width * LSBParams['flash']['width']))
+        else:
+            self.logger.info('Flash LED is off')
+        # if stim is enabled
         if params.do_stim:
             cmd[14] = 1
+            self.logger.info('STIM is on')
             cmd[16] = params.stim_level
+            # TODO: add debug info for STIM
+            self.logger.debug('')
             cmd[18] = params.stim_rate
+        else:
+            self.logger.info('STIM is off')
         self.send(cmd)
 
     def PhPktDestConfig(self, dest_str):
@@ -858,7 +911,7 @@ class QuaboConfig(QuaboSock):
         cmd[26] = acq['FLASH_WIDTH'] & 0x0f
         cmd[27] = 0
 
-    def AetAcqParams(self):
+    def SetAcqParams(self):
         """"
         Description:
             send the acquisition parameters to the quabo.
