@@ -12,6 +12,73 @@ import tftpy
 import struct
 import os
 
+from ping3 import ping
+
+import logging
+class Util(object):
+    """
+    Description:
+        The Util class is used to store some utility functions.
+    """
+    @staticmethod
+    def ip_addr_str_to_bytes(ip_addr_str):
+        """
+        Description:
+            convert the ip address string to bytes.
+        Inputs:
+            - ip_addr_str(str): the ip address string.
+        Outputs:
+            - bytes(bytearray): the ip address bytes.
+        """
+        pieces = ip_addr_str.strip().split('.')
+        if len(pieces) != 4:
+            raise Exception('bad IP addr %s'%ip_addr_str)
+        bytes = bytearray(4)
+        for i in range(4):
+            x = int(pieces[i])
+            if x<0 or x>255:
+                raise Exception('bad IP addr %s'%ip_addr_str)
+            bytes[i] = x
+        return bytes
+
+    @staticmethod
+    def reverse_bits(data_in, width):
+        """
+        Description:
+            reverse the bits of the data.
+        Inputs:
+            - data_in(int): the input data.
+            - width(int): the width of the data.
+        Outputs:
+            - data_out(int): the output data.
+        """
+        data_out = 0
+        for ii in range(width):
+            data_out = data_out << 1
+            if (data_in & 1): data_out = data_out | 1
+            data_in = data_in >> 1
+        return data_out
+    
+    @staticmethod
+    def ping(ip, timeout = 30):
+        """
+        Description:
+            ping the ip address.
+        Inputs:
+            - ip(str): the ip address to ping.
+            - timeout(int): the timeout for ping.
+                            the unit is seconds.
+        Outputs:            
+
+        """
+        response_time = ping(ip, timeout=timeout)
+        if response_time is None:
+            print(f"{ip} is not reachable (timeout)")
+            return False
+        else:
+            print(f"{ip} responded in {response_time * 1000:.2f} ms")
+            return True
+
 class tftpw(object):
     """
     Description:
@@ -189,51 +256,6 @@ class tftpw(object):
             pass
         os.remove(filename)
         
-class Util(object):
-    """
-    Description:
-        The Util class is used to store some utility functions.
-    """
-    @staticmethod
-    def ip_addr_str_to_bytes(ip_addr_str):
-        """
-        Description:
-            convert the ip address string to bytes.
-        Inputs:
-            - ip_addr_str(str): the ip address string.
-        Outputs:
-            - bytes(bytearray): the ip address bytes.
-        """
-        pieces = ip_addr_str.strip().split('.')
-        if len(pieces) != 4:
-            raise Exception('bad IP addr %s'%ip_addr_str)
-        bytes = bytearray(4)
-        for i in range(4):
-            x = int(pieces[i])
-            if x<0 or x>255:
-                raise Exception('bad IP addr %s'%ip_addr_str)
-            bytes[i] = x
-        return bytes
-
-    @staticmethod
-    def reverse_bits(data_in, width):
-        """
-        Description:
-            reverse the bits of the data.
-        Inputs:
-            - data_in(int): the input data.
-            - width(int): the width of the data.
-        Outputs:
-            - data_out(int): the output data.
-        """
-        data_out = 0
-        for ii in range(width):
-            data_out = data_out << 1
-            if (data_in & 1): data_out = data_out | 1
-            data_in = data_in >> 1
-        return data_out
-
-
 class QuaboSock(object):
     """
     Description:
@@ -361,6 +383,9 @@ class QuaboConfig(QuaboSock):
             - quabo_config_file(str): the file path of the quabo config file.
             - ip_config_file(str): the file path of the ip config file.
         """
+        # create logger
+        self.logger = logging.getLogger('jasper.dspflow')
+        # get ip
         self.ip_addr = ip_addr
         # create a socket
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -462,7 +487,7 @@ class QuaboConfig(QuaboSock):
         Inputs:
             - dest_str(str): the dest ip address or hostname for PH packets.
         """
-        self.quabo_config['ips']['PH'] = dest_str
+        self.quabo_config['dest_ips']['PH'] = dest_str
     
     def MoivePktDestConfig(self, dest_str):
         """
@@ -471,7 +496,7 @@ class QuaboConfig(QuaboSock):
         Inputs:
             - dest_str(str): the dest ip address or hostname for Moive packets.
         """
-        self.quabo_config['ips']['MOIVE'] = dest_str
+        self.quabo_config['dest_ips']['MOIVE'] = dest_str
 
     def SetDataPktDest(self):
         """
@@ -480,7 +505,7 @@ class QuaboConfig(QuaboSock):
         Inputs:
             - dest_str(str): the dest ip address or hostname for PH and Moive packets.
         """
-        ips = self.quabo_config['ips']
+        ips = self.quabo_config['dest_ips']
         ph_ip = ips['PH']
         movie_ip = ips['MOVIE']
         # get the IP address from hostname
@@ -507,7 +532,7 @@ class QuaboConfig(QuaboSock):
         Inputs:
             - dest_str(str): the dest ip address or hostname for HK packets.
         """
-        self.quabo_config['ips']['HK'] = dest_str   
+        self.quabo_config['dest_ips']['HK'] = dest_str   
 
     def SetHkPacketDest(self, dest_str):
         """
@@ -983,7 +1008,7 @@ class QuaboConfig(QuaboSock):
                 cfg = json.load(f)
         except:
             cfg = {}
-        cfg['ips'] = self.quabo_config['ips']
+        cfg['dest_ips'] = self.quabo_config['dest_ips']
         with open(config_file, 'w') as f:
             json.dump(cfg, f, indent=2)
 
@@ -1059,4 +1084,17 @@ class DataRecv(QuaboSock):
         super().__init__(ip_addr, port)
 
 if __name__ == '__main__':
-    pass
+    # get the quabo ip
+    with open('configs/quabo_ip.json') as f:
+        quabo_ip = json.load(f)
+    # ping the quabo first
+    # get the flash uid
+    quabo = tftpw(quabo_ip['ip'])
+    uid = quabo.get_flashuid()
+    # create a logger, and the file handler name is based on the uid
+    logger = logging.getLogger('Quabo-Autotest')
+    logger.setLevel(logging.DEBUG)
+    handler = logging.FileHandler('logs/Quabo-%s.log'%uid, mode='w')
+    logformat = logging.Formatter('%(levelname)s - %(asctime)s - %(name)s - %(message)s')
+    handler.setFormatter(logformat)
+    logger.addHandler(handler)
