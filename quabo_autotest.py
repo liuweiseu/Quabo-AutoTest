@@ -20,7 +20,8 @@ import numpy as np
 LSBParams = {
     'hv_setting': -1.14/10**-3,
     'stim': {
-        'rate': 100*10**6/np.array([19, 18, 17, 16, 15, 14, 13, 12])
+        'rate': 100*10**6/np.array([19, 18, 17, 16, 15, 14, 13, 12]),
+        'level': 
     },
     'flash': {
         'rate': np.array([1, 95, 191, 381, 763, 1526, 3052, 6104]),
@@ -100,12 +101,14 @@ class Util(object):
         Outputs:            
 
         """
+        logger = logging.getLogger('QuaboAutoTest.Util.ping')
+        logger.info('ping %s'%ip)
         response_time = ping(ip, timeout=timeout)
         if response_time is None:
-            print(f"{ip} is not reachable (timeout)")
+            logger.error(f"{ip} is not reachable (timeout)")
             return False
         else:
-            print(f"{ip} responded in {response_time * 1000:.2f} ms")
+            logger.info(f"{ip} responded in {response_time * 1000:.2f} ms")
             return True
 
 class tftpw(object):
@@ -414,7 +417,7 @@ class QuaboConfig(QuaboSock):
         """
         # create logger
         self.logger = logging.getLogger('QuaboAutoTest.QuaboConfig')
-        self.logger.info('Configure Quabo - %s'%ip_addr)
+        self.logger.info('Quabo IP - %s'%ip_addr)
         # get ip
         self.ip_addr = ip_addr
         # create a socket
@@ -486,7 +489,7 @@ class QuaboConfig(QuaboSock):
         Inputs:
             - params(DAQ_PARAMS): the daq parameters.
         """
-        self.logger.info('DaqParamsConfig')
+        self.logger.info('configure DAQ parameters')
         cmd = self.make_cmd(0x03)
         mode = 0
         if params.do_image:
@@ -527,8 +530,10 @@ class QuaboConfig(QuaboSock):
             self.logger.info('STIM is on')
             cmd[16] = params.stim_level
             # TODO: add debug info for STIM
-            self.logger.debug('')
+            self.logger.debug('STIM level is %d'%params.stim_level)
             cmd[18] = params.stim_rate
+            self.logger.debug('STIM rate is %d (%.2f Hz)'%(params.stim_rate,
+                                                           LSBParams['stim'][params.stim_rate]))
         else:
             self.logger.info('STIM is off')
         self.send(cmd)
@@ -540,6 +545,7 @@ class QuaboConfig(QuaboSock):
         Inputs:
             - dest_str(str): the dest ip address or hostname for PH packets.
         """
+        self.logger.info('configure PH packets destination IP: %s'%dest_str)
         self.quabo_config['dest_ips']['PH'] = dest_str
     
     def MoivePktDestConfig(self, dest_str):
@@ -549,6 +555,7 @@ class QuaboConfig(QuaboSock):
         Inputs:
             - dest_str(str): the dest ip address or hostname for Moive packets.
         """
+        self.logger.info('configure Moive packets destination IP: %s'%dest_str)
         self.quabo_config['dest_ips']['MOIVE'] = dest_str
 
     def SetDataPktDest(self):
@@ -561,6 +568,7 @@ class QuaboConfig(QuaboSock):
         ips = self.quabo_config['dest_ips']
         ph_ip = ips['PH']
         movie_ip = ips['MOVIE']
+        self.logger.info('set Moive/PH packets destination IPs: %s/%s'%(moive_ip, ph_ip))
         # get the IP address from hostname
         ph_ip_addr_str = socket.gethostbyname(ph_ip)
         ph_ip_addr_bytes = Util.ip_addr_str_to_bytes(ph_ip_addr_str)
@@ -585,6 +593,7 @@ class QuaboConfig(QuaboSock):
         Inputs:
             - dest_str(str): the dest ip address or hostname for HK packets.
         """
+        self.logger.info('configure HK packets destination IP: %s'%dest_str)
         self.quabo_config['dest_ips']['HK'] = dest_str   
 
     def SetHkPacketDest(self, dest_str):
@@ -597,6 +606,7 @@ class QuaboConfig(QuaboSock):
         # get the IP address from hostname
         ip_addr_str = socket.gethostbyname(dest_str)
         ip_addr_bytes = Util.ip_addr_str_to_bytes(ip_addr_str)
+        self.logger.info('set HK packets destination IP: %s'%ip_addr_bytes)
         cmd = self.make_cmd(0x0b)
         for i in range(4):
             cmd[i+1] = ip_addr_bytes[i]
@@ -667,69 +677,200 @@ class QuaboConfig(QuaboSock):
             vals_int = []
             for i in range(len(vals)): vals_int.append(int(vals[i],0))
             # For each tag, set the appropriate bit field
-            if (tag == "OTABG_ON"): self._set_bits_4(tag, vals_int, 0, 1)
-            if (tag == "DAC_ON"): self._set_bits_4(tag, vals_int, 1, 1)
-            if (tag == "SMALL_DAC"): self._set_bits_4(tag, vals_int, 2, 1)
+            if (tag == "OTABG_ON"): 
+                self._set_bits_4(tag, vals_int, 0, 1)
+                self.logger.debug('OTABG_ON: %d, %d, %d ,%d'%(vals_int[0], vals_int[1],
+                                                              vals_int[2], vals_int[3]))
+            if (tag == "DAC_ON"): 
+                self._set_bits_4(tag, vals_int, 1, 1)
+                self.logger.debug('DAC_ON: %d, %d, %d ,%d'%(vals_int[0], vals_int[1],
+                                                            vals_int[2], vals_int[3]))
+            if (tag == "SMALL_DAC"): 
+                self._set_bits_4(tag, vals_int, 2, 1)
+                self.logger.debug('SMALL_DAC: %d, %d, %d ,%d'%(vals_int[0], vals_int[1],
+                                                               vals_int[2], vals_int[3]))
             if (tag == "DAC2"):
                 #need to reverse the bits
                 vals_revbits = []
                 for i in range (4):
                     vals_revbits.append(Util.reverse_bits(int(vals[i],0),10))
                 self._set_bits_4(tag, vals_revbits, 3, 10)
+                self.logger.debug('DAC2: %d, %d, %d ,%d'%(vals_revbits[0], vals_revbits[1],
+                                                          vals_revbits[2], vals_revbits[3]))
             if (tag == "DAC1"):
                 vals_revbits = []
                 for i in range (4):
                     vals_revbits.append(Util.reverse_bits(int(vals[i],0),10))
                 self._set_bits_4(tag, vals_revbits, 13, 10)
-            if (tag == "ENB_OUT_ADC"): self._set_bits_4(tag, vals_int, 23, 1)
-            if (tag == "INV_START_GRAY"): self._set_bits_4(tag, vals_int, 24, 1)
-            if (tag == "RAMP8B"): self._set_bits_4(tag, vals_int, 25, 1)
-            if (tag == "RAMP10B"): self._set_bits_4(tag, vals_int, 26, 1)
-            if (tag == "CMD_CK_MUX"): self._set_bits_4(tag, vals_int, 155, 1)
-            if (tag == "D1_D2"): self._set_bits_4(tag, vals_int, 156, 1)
-            if (tag == "INV_DISCR_ADC"): self._set_bits_4(tag, vals_int, 157, 1)
-            if (tag == "POLAR_DISCRI"): self._set_bits_4(tag, vals_int, 158, 1)
-            if (tag == "ENB3ST"): self._set_bits_4(tag, vals_int, 159, 1)
-            if (tag == "VAL_DC_FSB2"): self._set_bits_4(tag, vals_int, 160, 1)
-            if (tag == "SW_FSB2_50F"): self._set_bits_4(tag, vals_int, 161, 1)
-            if (tag == "SW_FSB2_100F"): self._set_bits_4(tag, vals_int, 162, 1)
-            if (tag == "SW_FSB2_100K"): self._set_bits_4(tag, vals_int, 163, 1)
-            if (tag == "SW_FSB2_50K"): self._set_bits_4(tag, vals_int, 164, 1)
-            if (tag == "VALID_DC_FS"): self._set_bits_4(tag, vals_int, 165, 1)
-            if (tag == "CMD_FSB_FSU"): self._set_bits_4(tag, vals_int, 166, 1)
-            if (tag == "SW_FSB1_50F"): self._set_bits_4(tag, vals_int, 167, 1)
-            if (tag == "SW_FSB1_100F"): self._set_bits_4(tag, vals_int, 168, 1)
-            if (tag == "SW_FSB1_100K"): self._set_bits_4(tag, vals_int, 169, 1)
-            if (tag == "SW_FSB1_50k"): self._set_bits_4(tag, vals_int, 170, 1)
-            if (tag == "SW_FSU_100K"): self._set_bits_4(tag, vals_int, 171, 1)
-            if (tag == "SW_FSU_50K"): self._set_bits_4(tag, vals_int, 172, 1)
-            if (tag == "SW_FSU_25K"): self._set_bits_4(tag, vals_int, 173, 1)
-            if (tag == "SW_FSU_40F"): self._set_bits_4(tag, vals_int, 174, 1)
-            if (tag == "SW_FSU_20F"): self._set_bits_4(tag, vals_int, 175, 1)
-            if (tag == "H1H2_CHOICE"): self._set_bits_4(tag, vals_int, 176, 1)
-            if (tag == "EN_ADC"): self._set_bits_4(tag, vals_int, 177, 1)
-            if (tag == "SW_SS_1200F"): self._set_bits_4(tag, vals_int, 178, 1)
-            if (tag == "SW_SS_600F"): self._set_bits_4(tag, vals_int, 179, 1)
-            if (tag == "SW_SS_300F"): self._set_bits_4(tag, vals_int, 180, 1)
-            if (tag == "ON_OFF_SS"): self._set_bits_4(tag, vals_int, 181, 1)
-            if (tag == "SWB_BUF_2P"): self._set_bits_4(tag, vals_int, 182, 1)
-            if (tag == "SWB_BUF_1P"): self._set_bits_4(tag, vals_int, 183, 1)
-            if (tag == "SWB_BUF_500F"): self._set_bits_4(tag, vals_int, 184, 1)
-            if (tag == "SWB_BUF_250F"): self._set_bits_4(tag, vals_int, 185, 1)
-            if (tag == "CMD_FSB"): self._set_bits_4(tag, vals_int, 186, 1)
-            if (tag == "CMD_SS"): self._set_bits_4(tag, vals_int, 187, 1)
-            if (tag == "CMD_FSU"): self._set_bits_4(tag, vals_int, 188, 1)
+                self.logger.debug('DAC2: %d, %d, %d ,%d'%(vals_revbits[0], vals_revbits[1],
+                                                          vals_revbits[2], vals_revbits[3]))
+            if (tag == "ENB_OUT_ADC"): 
+                self._set_bits_4(tag, vals_int, 23, 1)
+                self.logger.debug('ENB_OUT_ADC: %d, %d, %d ,%d'%(vals_int[0], vals_int[1],
+                                                               vals_int[2], vals_int[3]))
+            if (tag == "INV_START_GRAY"): 
+                self._set_bits_4(tag, vals_int, 24, 1)
+                self.logger.debug('INV_START_GRAY: %d, %d, %d ,%d'%(vals_int[0], vals_int[1],
+                                                               vals_int[2], vals_int[3]))
+            if (tag == "RAMP8B"): 
+                self._set_bits_4(tag, vals_int, 25, 1)
+                self.logger.debug('RAMP8B: %d, %d, %d ,%d'%(vals_int[0], vals_int[1],
+                                                               vals_int[2], vals_int[3]))
+            if (tag == "RAMP10B"): 
+                self._set_bits_4(tag, vals_int, 26, 1)
+                self.logger.debug('RAMP10B: %d, %d, %d ,%d'%(vals_int[0], vals_int[1],
+                                                               vals_int[2], vals_int[3]))
+            if (tag == "CMD_CK_MUX"): 
+                self._set_bits_4(tag, vals_int, 155, 1)
+                self.logger.debug('CMD_CK_MUX: %d, %d, %d ,%d'%(vals_int[0], vals_int[1],
+                                                               vals_int[2], vals_int[3]))
+            if (tag == "D1_D2"): 
+                self._set_bits_4(tag, vals_int, 156, 1)
+                self.logger.debug('D1_D2: %d, %d, %d ,%d'%(vals_int[0], vals_int[1],
+                                                               vals_int[2], vals_int[3]))
+            if (tag == "INV_DISCR_ADC"): 
+                self._set_bits_4(tag, vals_int, 157, 1)
+                self.logger.debug('INV_DISCR_ADC: %d, %d, %d ,%d'%(vals_int[0], vals_int[1],
+                                                               vals_int[2], vals_int[3]))
+            if (tag == "POLAR_DISCRI"): 
+                self._set_bits_4(tag, vals_int, 158, 1)
+                self.logger.debug('POLAR_DISCRI: %d, %d, %d ,%d'%(vals_int[0], vals_int[1],
+                                                               vals_int[2], vals_int[3]))
+            if (tag == "ENB3ST"): 
+                self._set_bits_4(tag, vals_int, 159, 1)
+                self.logger.debug('ENB3ST: %d, %d, %d ,%d'%(vals_int[0], vals_int[1],
+                                                               vals_int[2], vals_int[3]))
+            if (tag == "VAL_DC_FSB2"): 
+                self._set_bits_4(tag, vals_int, 160, 1)
+                self.logger.debug('VAL_DC_FSB2: %d, %d, %d ,%d'%(vals_int[0], vals_int[1],
+                                                               vals_int[2], vals_int[3]))
+            if (tag == "SW_FSB2_50F"): 
+                self._set_bits_4(tag, vals_int, 161, 1)
+                self.logger.debug('SW_FSB2_50F: %d, %d, %d ,%d'%(vals_int[0], vals_int[1],
+                                                               vals_int[2], vals_int[3]))
+            if (tag == "SW_FSB2_100F"): 
+                self._set_bits_4(tag, vals_int, 162, 1)
+                self.logger.debug('SW_FSB2_100F: %d, %d, %d ,%d'%(vals_int[0], vals_int[1],
+                                                               vals_int[2], vals_int[3]))
+            if (tag == "SW_FSB2_100K"): 
+                self._set_bits_4(tag, vals_int, 163, 1)
+                self.logger.debug('SW_FSB2_100K: %d, %d, %d ,%d'%(vals_int[0], vals_int[1],
+                                                               vals_int[2], vals_int[3]))
+            if (tag == "SW_FSB2_50K"): 
+                self._set_bits_4(tag, vals_int, 164, 1)
+                self.logger.debug('SW_FSB2_50K: %d, %d, %d ,%d'%(vals_int[0], vals_int[1],
+                                                               vals_int[2], vals_int[3]))
+            if (tag == "VALID_DC_FS"): 
+                self._set_bits_4(tag, vals_int, 165, 1)
+                self.logger.debug('VALID_DC_FS: %d, %d, %d ,%d'%(vals_int[0], vals_int[1],
+                                                               vals_int[2], vals_int[3]))
+            if (tag == "CMD_FSB_FSU"): 
+                self._set_bits_4(tag, vals_int, 166, 1)
+                self.logger.debug('CMD_FSB_FSU: %d, %d, %d ,%d'%(vals_int[0], vals_int[1],
+                                                               vals_int[2], vals_int[3]))
+            if (tag == "SW_FSB1_50F"): 
+                self._set_bits_4(tag, vals_int, 167, 1)
+                self.logger.debug('SW_FSB1_50F: %d, %d, %d ,%d'%(vals_int[0], vals_int[1],
+                                                               vals_int[2], vals_int[3]))
+            if (tag == "SW_FSB1_100F"): 
+                self._set_bits_4(tag, vals_int, 168, 1)
+                self.logger.debug('SW_FSB1_100F: %d, %d, %d ,%d'%(vals_int[0], vals_int[1],
+                                                               vals_int[2], vals_int[3]))
+            if (tag == "SW_FSB1_100K"): 
+                self._set_bits_4(tag, vals_int, 169, 1)
+                self.logger.debug('SW_FSB1_100K: %d, %d, %d ,%d'%(vals_int[0], vals_int[1],
+                                                               vals_int[2], vals_int[3]))
+            if (tag == "SW_FSB1_50k"): 
+                self._set_bits_4(tag, vals_int, 170, 1)
+                self.logger.debug('SW_FSB1_50k: %d, %d, %d ,%d'%(vals_int[0], vals_int[1],
+                                                               vals_int[2], vals_int[3]))
+            if (tag == "SW_FSU_100K"): 
+                self._set_bits_4(tag, vals_int, 171, 1)
+                self.logger.debug('SW_FSU_100K: %d, %d, %d ,%d'%(vals_int[0], vals_int[1],
+                                                               vals_int[2], vals_int[3]))
+            if (tag == "SW_FSU_50K"): 
+                self._set_bits_4(tag, vals_int, 172, 1)
+                self.logger.debug('SMALL_DAC: %d, %d, %d ,%d'%(vals_int[0], vals_int[1],
+                                                               vals_int[2], vals_int[3]))
+            if (tag == "SW_FSU_25K"): 
+                self._set_bits_4(tag, vals_int, 173, 1)
+                self.logger.debug('SW_FSU_25K: %d, %d, %d ,%d'%(vals_int[0], vals_int[1],
+                                                               vals_int[2], vals_int[3]))
+            if (tag == "SW_FSU_40F"): 
+                self._set_bits_4(tag, vals_int, 174, 1)
+                self.logger.debug('SW_FSU_40F: %d, %d, %d ,%d'%(vals_int[0], vals_int[1],
+                                                               vals_int[2], vals_int[3]))
+            if (tag == "SW_FSU_20F"): 
+                self._set_bits_4(tag, vals_int, 175, 1)
+                self.logger.debug('SW_FSU_20F: %d, %d, %d ,%d'%(vals_int[0], vals_int[1],
+                                                               vals_int[2], vals_int[3]))
+            if (tag == "H1H2_CHOICE"): 
+                self._set_bits_4(tag, vals_int, 176, 1)
+                self.logger.debug('H1H2_CHOICE: %d, %d, %d ,%d'%(vals_int[0], vals_int[1],
+                                                               vals_int[2], vals_int[3]))
+            if (tag == "EN_ADC"): 
+                self._set_bits_4(tag, vals_int, 177, 1)
+                self.logger.debug('EN_ADC: %d, %d, %d ,%d'%(vals_int[0], vals_int[1],
+                                                               vals_int[2], vals_int[3]))
+            if (tag == "SW_SS_1200F"): 
+                self._set_bits_4(tag, vals_int, 178, 1)
+                self.logger.debug('SW_SS_1200F: %d, %d, %d ,%d'%(vals_int[0], vals_int[1],
+                                                               vals_int[2], vals_int[3]))
+            if (tag == "SW_SS_600F"): 
+                self._set_bits_4(tag, vals_int, 179, 1)
+                self.logger.debug('SW_SS_600F: %d, %d, %d ,%d'%(vals_int[0], vals_int[1],
+                                                               vals_int[2], vals_int[3]))
+            if (tag == "SW_SS_300F"): 
+                self._set_bits_4(tag, vals_int, 180, 1)
+                self.logger.debug('SW_SS_300F: %d, %d, %d ,%d'%(vals_int[0], vals_int[1],
+                                                               vals_int[2], vals_int[3]))
+            if (tag == "ON_OFF_SS"): 
+                self._set_bits_4(tag, vals_int, 181, 1)
+                self.logger.debug('ON_OFF_SS: %d, %d, %d ,%d'%(vals_int[0], vals_int[1],
+                                                               vals_int[2], vals_int[3]))
+            if (tag == "SWB_BUF_2P"): 
+                self._set_bits_4(tag, vals_int, 182, 1)
+                self.logger.debug('SWB_BUF_2P: %d, %d, %d ,%d'%(vals_int[0], vals_int[1],
+                                                               vals_int[2], vals_int[3]))
+            if (tag == "SWB_BUF_1P"): 
+                self._set_bits_4(tag, vals_int, 183, 1)
+                self.logger.debug('SWB_BUF_1P: %d, %d, %d ,%d'%(vals_int[0], vals_int[1],
+                                                               vals_int[2], vals_int[3]))
+            if (tag == "SWB_BUF_500F"): 
+                self._set_bits_4(tag, vals_int, 184, 1)
+                self.logger.debug('SWB_BUF_500F: %d, %d, %d ,%d'%(vals_int[0], vals_int[1],
+                                                               vals_int[2], vals_int[3]))
+            if (tag == "SWB_BUF_250F"): 
+                self._set_bits_4(tag, vals_int, 185, 1)
+                self.logger.debug('SWB_BUF_250F: %d, %d, %d ,%d'%(vals_int[0], vals_int[1],
+                                                               vals_int[2], vals_int[3]))
+            if (tag == "CMD_FSB"):
+                self._set_bits_4(tag, vals_int, 186, 1)
+                self.logger.debug('CMD_FSB: %d, %d, %d ,%d'%(vals_int[0], vals_int[1],
+                                                               vals_int[2], vals_int[3]))
+            if (tag == "CMD_SS"): 
+                self._set_bits_4(tag, vals_int, 187, 1)
+                self.logger.debug('CMD_SS: %d, %d, %d ,%d'%(vals_int[0], vals_int[1],
+                                                               vals_int[2], vals_int[3]))
+            if (tag == "CMD_FSU"): 
+                self._set_bits_4(tag, vals_int, 188, 1)
+                self.logger.debug('CMD_FSU: %d, %d, %d ,%d'%(vals_int[0], vals_int[1],
+                                                               vals_int[2], vals_int[3]))
 
             #Look for a MASKOR1 value; chan is in range 0-63, with a quad of values, one for each chip
             if tag.startswith("MASKOR1"):
                 chan = tag.split('_')[1]
                 chan = int(chan)
                 self._set_bits_4(tag, vals_int, 154-(2*chan), 1)
+                self.logger.debug('MASKOR1_%02d: %d, %d, %d ,%d'%(chan, vals_int[0], vals_int[1],
+                                                               vals_int[2], vals_int[3]))
             #Look for a MASKOR2 value; chan is in range 0-63, with a quad of values, one for each chip
             if tag.startswith("MASKOR2"):
                 chan = tag.split('_')[1]
                 chan = int(chan)
                 self._set_bits_4(tag, vals_int, 153-(2*chan), 1)
+                self.logger.debug('MASKOR2_%02d: %d, %d, %d ,%d'%(chan, vals_int[0], vals_int[1],
+                                                               vals_int[2], vals_int[3]))
             #Look for a CTEST value; chan is in range 0-63, with a quad of values, one for each chip
             if tag.startswith("CTEST"):
                 chan = tag.split('_')[1]
@@ -737,6 +878,8 @@ class QuaboConfig(QuaboSock):
                 #if chan in range(4):
                     #vals_int = [0,0,0,0]
                 self._set_bits_4(tag, vals_int, 828-chan, 1)
+                self.logger.debug('CTEST_%02d: %d, %d, %d ,%d'%(chan, vals_int[0], vals_int[1],
+                                                               vals_int[2], vals_int[3]))
                 #print(tag, vals_int, chan)
 
             #Look for a GAIN value; chan is in range 0-63, with a quad of values, one for each chip
@@ -748,6 +891,8 @@ class QuaboConfig(QuaboSock):
                 for i in range (4):
                     vals_revbits.append(Util.reverse_bits((vals_int[i]),8))
                 self._set_bits_4(tag, vals_revbits, 757-9*chan,8)
+                self.logger.debug('GAIN%02d: %d, %d, %d ,%d'%(chan, vals_revbits[0], vals_revbits[1],
+                                                               vals_revbits[2], vals_revbits[3]))
             for ii in range(104):
                 cmd[ii+4] = self.MAROC_regs[0][ii]
                 cmd[ii+132] = self.MAROC_regs[1][ii]
@@ -759,6 +904,7 @@ class QuaboConfig(QuaboSock):
         Description:
             send the maroc parameters to the quabo.
         """
+        self.logger.info('set MAROC parameters')
         cmd = bytearray(492)
         maroc_config = self.quabo_config['maroc']
         self._make_maroc_cmd(maroc_config, cmd)
@@ -770,8 +916,9 @@ class QuaboConfig(QuaboSock):
             set the maroc parameters.
         Inputs:
             - tag(str): the tag.
-            - vals(list): the values.
+            - vals(str): the values.
         """
+        self.logger.info('configure Maroc chip: %s - %s'%(tag, vals))
         self.quabo_config['maroc'][tag] = vals
 
     def SetHv(self, chan = 0b1111):
@@ -782,15 +929,20 @@ class QuaboConfig(QuaboSock):
         Inputs: 
             - chan: 4-bit binary number, each bit represents a channel.
         """
+        self.logger.info('set HV')
         cmd = self.make_cmd(0x02)
+        lsb = LSBParams['hv_setting']
         # set the hv values for the enabled channels
         for i in range(4):
             if (chan & (1<<i)):
-                cmd[2*i+2] = self.quabo_config['hv']['HV_%d'%i] & 0xff
-                cmd[2*i+3] = (self.quabo_config['hv']['HV_%d'%i] >> 8) & 0xff
+                val = self.quabo_config['hv']['HV_%d'%i]
+                cmd[2*i+2] = val & 0xff
+                cmd[2*i+3] = (val>> 8) & 0xff
+                self.logger.debug('HV_%d: %d (%.2f V)'%(i, val, val * lsb))
             else:
                 cmd[2*i+2] = 0
                 cmd[2*i+3] = 0
+                self.logger.debug('HV_%d: %d (%.2f V)'%(i, 0, 0))
         self.flush_rx_buf()
         self.send(cmd)
 
@@ -802,6 +954,7 @@ class QuaboConfig(QuaboSock):
             - chan(int): the channel number.
             - value(int): the high voltage value.
         """
+        self.logger.info('configure HV: HV_%d - %d'%(chan, value))
         self.quabo_config['hv']['HV_%d'%chan] = value
 
     def _parse_trigger_parameters(self, cmd):
@@ -816,14 +969,18 @@ class QuaboConfig(QuaboSock):
             if(tag.startswith('CHANMASK')):
                 ch = tag.split('_')[1]
                 ch = int(ch)
+                # only hex string is supported
+                val = int(val, 16)
                 for j in range(4): 
-                    cmd[4+ch*4+j] = (val>>j*8) & 0xff 
+                    cmd[4+ch*4+j] = (val>>j*8) & 0xff
+                    self.logger.debug('CHANMASK_%d: 0x%x'%val)
 
     def SetTriggerMask(self):
         """"
         Description:
             send the trigger mask parameters to the quabo.
         """
+        self.logger.info('set trigger mask')
         cmd = self.make_cmd(0x06)
         self._parse_chanmask_parameters(cmd)
         self.flush_rx_buf()
@@ -837,6 +994,7 @@ class QuaboConfig(QuaboSock):
             - chan(int): the channel number.
             - value(int): the value of the parameter.
         """
+        self.logger.info('configure chanmask: CHANMASK_%d - 0x%x'%(chan, value))
         self.quabo_config['chanmask']['CHANMASK_%d'%chan] = value
 
     def _parse_goe_mask_parameters(self, cmd):
@@ -849,13 +1007,16 @@ class QuaboConfig(QuaboSock):
         chanmask = self.quabo_config['chanmask']
         for tag, val in chanmask.items():
             if(tag == 'GOEMASK'):
+                val = int(val, 16)
                 cmd[4] = val & 0x03
+                self.logger.debug('GOEMASK: 0x%x'%val)
 
     def SetGoeMask(self):
         """
         Description:
             send the goe mask parameters to the quabo.
         """
+        self.logger.info('set GOE mask')
         cmd = self.make_cmd(0x0e)
         self._parse_goe_mask_parameters(cmd)
         self.flush_rx_buf()
@@ -869,6 +1030,7 @@ class QuaboConfig(QuaboSock):
             - value(int): the value of the parameter.
         """
         # TODO: check if the value is valid
+        self.logger.info('configure GOE mask: GOE - 0x%x'%value)
         self.quabo_config['chanmask']['GOEMASK'] = value
 
     def _parse_acq_parameters(self, cmd):
@@ -883,32 +1045,44 @@ class QuaboConfig(QuaboSock):
         for k, v in acq.items():
             acq[k] = int(v, 0)
         cmd[2] = acq['ACQMODE'] & 0xff
-        cmd[3] = (acq['ACQMODE'] >> 8) & 0xff 
+        self.logger.debug('ACQMODE: 0x%x'% cmd[2])
+        cmd[3] = (acq['ACQMODE'] >> 8) & 0xff
         cmd[4] = acq['ACQINT'] & 0xff
         cmd[5] = (acq['ACQINT'] >> 8) & 0xff
+        self.logger.debug('ACQINT: %d'%(cmd[4] + cmd[5]*256))
         cmd[6] = acq['HOLD1'] & 0xff
+        self.logger.debug('HOLD1: %d'%cmd[6])
         cmd[7] = (acq['HOLD1'] >> 8) & 0xff
         cmd[8] = acq['HOLD2'] & 0xff
+        self.logger.debug('HOLD2: %d'%cmd[8])
         cmd[9] = (acq['HOLD2'] >> 8) & 0xff
         cmd[10] = acq['ADCCLKPH'] & 0xff
+        self.logger.debug('ADCCLKPH: %d'%cmd[10])
         cmd[11] = (acq['ADCCLKPH'] >> 8) & 0xff
         cmd[12] = acq['MONCHAN'] & 0xff
+        self.logger.debug('MONCHAN: %d'%cmd[12])
         cmd[13] = (acq['MONCHAN'] >> 8) & 0xff
         cmd[14] = acq['STIMON'] & 0x01
+        self.logger.debug('STIMON: %d'cmd[14])
         cmd[15] = 0
         cmd[16] = acq['STIM_LEVEL'] & 0xff
+        self.logger.debug('STIM_LEVEL: %d'%cmd[16])
         cmd[17] = 0
         cmd[18] = acq['STIM_RATE'] & 0x07
+        self.logger.debug('STIM_RATE: %d'%cmd[18])
         cmd[19] = 0
         #cmd[20] = acq['EN_WR_UART'] & 0x01
         # EN_WR_UART is not used in the config file, so set it to 0
         cmd[20] = 0
         cmd[21] = 0
         cmd[22] = acq['FLASH_RATE'] & 0x07
+        self.logger.debug('FLASH_RATE: %d'%cmd[22])
         cmd[23] = 0
         cmd[24] = acq['FLASH_LEVEL'] & 0x1f
+        self.logger.debug('FLASH_LEVEL: %d'%cmd[24])
         cmd[25] = 0
         cmd[26] = acq['FLASH_WIDTH'] & 0x0f
+        self.logger.debug('FLASH_WIDTH: %d'%cmd[26])
         cmd[27] = 0
 
     def SetAcqParams(self):
@@ -916,6 +1090,7 @@ class QuaboConfig(QuaboSock):
         Description:
             send the acquisition parameters to the quabo.
         """
+        self.logger.info('set acq parameters')
         cmd = self.make_cmd(0x03)
         self._parse_acq_parameters(cmd)
         self.flush_rx_buf()
@@ -929,6 +1104,7 @@ class QuaboConfig(QuaboSock):
             - key(str): the key of the parameter.
             - value(int): the value of the parameter.
         """
+        self.logger.info('configure acq param: %s - %d'%(key, value))
         self.quabo_config['acq'][key] = value
         
     def Reset(self):
@@ -938,6 +1114,7 @@ class QuaboConfig(QuaboSock):
         Note: 
             this command may not be valid currently.
         """
+        self.logger.info('reset the quabo')
         cmd = self.make_cmd(0x04)
         self.send(cmd)
 
@@ -951,6 +1128,7 @@ class QuaboConfig(QuaboSock):
         """
         # TODO: we don't have enough information about this command??
         # what does endzone, backoff...mean?
+        self.logger.info('set focus: steps - %d'%steps)
         endzone = 300
         backoff = 200
         step_ontime = 10000
@@ -980,6 +1158,7 @@ class QuaboConfig(QuaboSock):
         """
         # TODO: we don't have enough information about this command??
         # TODO: Do we still use this command?
+        self.logger.info('set shutter: status - %d'%closed)
         cmd = self.make_cmd(0x05)
         self.shutter_open = 0 if closed else 1
         self.shutter_power = 1
@@ -1001,6 +1180,7 @@ class QuaboConfig(QuaboSock):
             - fanspeed(int): the fan speed. 
                              valid range is 0-15.
         """
+        self.logger.info('set fan: fanspeed - %d'%fanspeed)
         # TODO: we don't have enough information about this command??
         self.fanspeed = fanspeed
         cmd = self.make_cmd(0x85)
@@ -1017,6 +1197,7 @@ class QuaboConfig(QuaboSock):
         Inputs:
             - closed(bool): whether to close the shutter.
         """
+        self.logger.info('set shutter(new): status - %d'%closed)
         cmd = self.make_cmd(0x08)
         cmd[1] = 0x01 if closed else 0x0
         self.send(cmd)
@@ -1028,6 +1209,7 @@ class QuaboConfig(QuaboSock):
         Inputs:
             - val(bool): whether to turn on the led flash
         """
+        self.logger.info('set led flasher: status - %d'%val)
         cmd = self.make_cmd(0x09)
         cmd[1] = 0x01 if val else 0x0
         self.send(cmd)
@@ -1037,6 +1219,7 @@ class QuaboConfig(QuaboSock):
         Description:
             calibrate the pulse height baseline.
         """
+        self.logger.info('cal PH baseline')
         cmd = self.make_cmd(0x07)
         self.flush_rx_buf()
         self.send(cmd)
@@ -1056,10 +1239,12 @@ class QuaboConfig(QuaboSock):
         Inputs:
             - config_file(str): the config file path.
         """
+        self.logger.info('write IPs config to a file')
         try:
             with open(config_file, 'rb') as f:
                 cfg = json.load(f)
         except:
+            self.logger.debug('new config file created when calling `WriteIPsConfig`')
             cfg = {}
         cfg['dest_ips'] = self.quabo_config['dest_ips']
         with open(config_file, 'w') as f:
@@ -1072,10 +1257,12 @@ class QuaboConfig(QuaboSock):
         Inputs:
             - config_file(str): the config file path.
         """
+        self.logger.info('write MAROC config to a file')
         try:
             with open(config_file, 'rb') as f:
                 cfg = json.load(f)
         except:
+            self.logger.debug('new config file created when calling `WriteMarocConfig`')
             cfg = {}
         cfg['maroc'] = self.quabo_config['maroc']
         with open(config_file, 'w') as f:
@@ -1088,10 +1275,12 @@ class QuaboConfig(QuaboSock):
         Inputs:
             - config_file(str): the config file path.
         """
+        self.logger.info('write mask config to a file')
         try:
             with open(config_file, 'rb') as f:
                 cfg = json.load(f)
         except:
+            self.logger.debug('new config file created when calling `WriteMaskConfig`')
             cfg = {}
         # create the tag list
         cfg['chanmask'] = self.quabo_config['chanmask']
@@ -1114,6 +1303,9 @@ class HKRecv(QuaboSock):
             - ip_addr(str): the ip address of the quabo.
         """
         super().__init__(ip_addr, HKRecv.PORTS['HK'])
+        self.logger = logging.getLogger('Quabo-Autotest.HKRecv')
+        self.logger.info('Init HKRecv class - IP: %s'%ip_addr)
+        self.logger.info('Init HKRecv class - PORT: %d'%HKRecv.PORTS['HK'])
     
     def FirmwareVersion(self):
         pass
@@ -1135,6 +1327,9 @@ class DataRecv(QuaboSock):
             - port(int): the port number.
         """
         super().__init__(ip_addr, port)
+        self.logger = logging.getLogger('Quabo-Autotest.DataRecv')
+        self.logger.info('Init DataRecv class - IP: %s'%ip_addr)
+        self.logger.info('Init DataRecv class - PORT: %d'%port)
 
 if __name__ == '__main__':
     # get the quabo ip
