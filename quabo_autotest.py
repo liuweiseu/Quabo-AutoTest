@@ -140,6 +140,17 @@ class tftpw(object):
         self.client = tftpy.TftpClient(ip,port)
         self.logger = Util.create_logger('logs/firmware.log', mode='a', tag='Firmware')
         self.logger.info('TFTP client created for %s'%ip)
+        # deal with log in tftpy
+        log_tags = ["tftpy.TftpStates", "tftpy.TftpContext"]
+        for tag in log_tags:
+            logger = logging.getLogger(tag)
+            logger.setLevel(logging.DEBUG)
+            handler = logging.FileHandler('logs/tftpy.log', mode='w')
+            logformat = logging.Formatter('%(levelname)s - %(asctime)s - %(message)s')
+            handler.setFormatter(logformat)
+            if logger.handlers:
+                logger.handlers.clear()
+            logger.addHandler(handler)
 
     def help(self):
         """
@@ -310,10 +321,13 @@ class tftpw(object):
             s = struct.pack('B', addr>>(8*(4-i))&0xFF)
             fp.write(s)
         fp.close()
+        """
         print('*******************************************************')
         print('FPGA is rebooting, just ignore the timeout information')
         print('Wait for 30s, and then check housekeeping data!')
         print('*******************************************************')
+        """
+        self.logger.info('Rebooting FPGA...')
         try:
             self.client.upload(remote_filename,filename)
         except:
