@@ -20,8 +20,7 @@ import numpy as np
 LSBParams = {
     'hv_setting': -1.14/10**-3,
     'stim': {
-        'rate': 100*10**6/np.array([19, 18, 17, 16, 15, 14, 13, 12]),
-        'level': 
+        'rate': 100*10**6/np.array([19, 18, 17, 16, 15, 14, 13, 12])
     },
     'flash': {
         'rate': np.array([1, 95, 191, 381, 763, 1526, 3052, 6104]),
@@ -90,26 +89,47 @@ class Util(object):
         return data_out
     
     @staticmethod
-    def ping(ip, timeout = 30):
+    def ping(ip, loop = 30, timeout = 1):
         """
         Description:
             ping the ip address.
         Inputs:
             - ip(str): the ip address to ping.
+            - loop(int): the number of ping attempts.
             - timeout(int): the timeout for ping.
                             the unit is seconds.
-        Outputs:            
-
+        Outputs: 
+            - bool: True if the ip is reachable, False otherwise.           
         """
-        logger = logging.getLogger('QuaboAutoTest.Util.ping')
-        logger.info('ping %s'%ip)
-        response_time = ping(ip, timeout=timeout)
-        if response_time is None:
-            logger.error(f"{ip} is not reachable (timeout)")
-            return False
-        else:
-            logger.info(f"{ip} responded in {response_time * 1000:.2f} ms")
-            return True
+        for i in range(loop):
+            response_time = ping(ip, timeout=timeout)
+            if response_time is not None:
+                print(f"{ip} responded in {response_time * 1000:.2f} ms")
+                return True
+        print(f"{ip} is not reachable (timeout)")
+        return False
+    
+    @staticmethod
+    def create_logger(filename, mode='w', tag='QuaboAutoTest'):
+        """ 
+        Description:
+            create a logger for the quabo autotest.
+        Inputs:
+            - tag(str): the tag of the logger.
+            - filename(str): the file name of log file.
+        Outputs:
+            - logger(logging.Logger): the logger object.
+        """
+        logger = logging.getLogger(tag)
+        logger.setLevel(logging.DEBUG)
+        handler = logging.FileHandler(filename, mode=mode)
+        logformat = logging.Formatter('%(levelname)s - %(asctime)s - %(name)s - %(message)s')
+        handler.setFormatter(logformat)
+        if logger.handlers:
+            logger.handlers.clear()
+        logger.addHandler(handler)
+        return logger
+            
 
 class tftpw(object):
     """
@@ -118,7 +138,9 @@ class tftpw(object):
     """
     def __init__(self,ip,port=69):
         self.client = tftpy.TftpClient(ip,port)
-    
+        self.logger = Util.create_logger('logs/firmware.log', mode='a', tag='Firmware')
+        self.logger.info('TFTP client created for %s'%ip)
+
     def help(self):
         """
         Description:
@@ -140,8 +162,13 @@ class tftpw(object):
         Inputs:
             - filename(str): the file name to save flash device ID.
         """
+        self.logger.info('Download flash Device ID from panoseti flash chip...')
         self.client.download('/flashuid',filename)
-        print('Get flash Device ID successfully!')
+        with open(filename,'rb') as fp:
+            flashuid = fp.read()
+        self.logger.info('Get flash Device ID successfully!')
+        self.logger.debug('Flash Device ID: %s'%flashuid.hex())
+        return flashuid.hex()
         
     def get_wrpc_filesys(self, filename='wrpc_filesys',addr=0x00e00000):
         """
@@ -153,6 +180,7 @@ class tftpw(object):
             - filename(str): the file name to save wrpc file system.
             - addr(int): the start address to read wrpc file system from flash chip.
         """
+        self.logger.info('Download wrpc file system from panoseti flash chip...')
         fp_w = open(filename,'wb')
         # we can get 65535 bytes each time, so we need to repeat the download operation for 16 times
         # for convenience, we read 32768 bytes each time
@@ -174,7 +202,7 @@ class tftpw(object):
         fp_r.close()
         fp_w.close()
         os.remove('tmp')
-        print('Download wrpc file system successfully!')
+        self.logger.info('Download wrpc file system successfully!')
         
     def get_mb_file(self, filename='mb_file',addr=0x00F10000):
         """
@@ -186,6 +214,7 @@ class tftpw(object):
             - filename(str): the file name to save mb file.
             - addr(int): the start address to read mb file from flash chip.
         """
+        self.logger.info('Download mb file from panoseti mb_file space...')
         fp_w = open(filename,'wb')
         # we can get 65535 bytes each time, so we need to repeat the download operation for 16 times
         # for convenience, we read 32768 bytes each time
@@ -206,7 +235,7 @@ class tftpw(object):
             fp_r.close()
         fp_w.close()
         os.remove('tmp')
-        print('Download mb file successfully!')
+        self.logger.info('Download mb file successfully!')
         
     def put_wrpc_filesys(self,filename='wrpc_filesys', addr=0x00E00000):
         """
@@ -217,6 +246,7 @@ class tftpw(object):
             - filename(str): the file name to upload to flash chip.
             - addr(int): the start address to write wrpc file system to flash chip.
         """
+        self.logger.info('Upload %s to panoseti wrpc_filesys space...'%filename)
         offset = str(hex(addr))
         remote_filename = '/flash.' + offset[2:]
         # print('remote_filename  ',remote_filename)
@@ -226,7 +256,7 @@ class tftpw(object):
             print('The size of wrpc_filesys is incorrect, please check it!')
             return
         self.client.upload(remote_filename,filename)    
-        print('Upload %s to panoseti wrpc_filesys space successfully!' %filename)
+        self.logger.info('Upload %s to panoseti wrpc_filesys space successfully!' %filename)
         
     def put_mb_file(self,filename='mb_file', addr=0x00F10000):
         """
@@ -237,16 +267,17 @@ class tftpw(object):
             - filename(str): the file name to upload to flash chip.
             - addr(int): the start address to write mb file to flash chip.
         """
+        self.logger.info('Upload %s to panoseti mb_file space...'%filename)
         offset = str(hex(addr))
         remote_filename = '/flash.' + offset[2:]
         # print('remote_filename  ',remote_filename)
         size = os.path.getsize(filename)
         # check the size of mb_file
         if size > 0x100000 :
-            print('The size of mb file is too large, and it will mess up other parts on the flash chip!')
+            self.logger.error('The size of mb file is too large, and it will mess up other parts on the flash chip!')
             return
         self.client.upload(remote_filename,filename)
-        print('Upload %s to panoseti mb_file space successfully!' %filename)
+        self.logger.info('Upload %s to panoseti mb_file space successfully!' %filename)
         
     def put_bin_file(self,filename,addr=0x01010000):
         """
@@ -257,11 +288,12 @@ class tftpw(object):
             - filename(str): the file name to upload to flash chip.
             - addr(int): the start address to write bin file to flash chip.
         """
+        self.logger.info('Upload %s to panoseti bin file space...'%filename)
         offset = str(hex(addr))
         remote_filename = '/flash.' + offset[2:]
         # print('remote_filename :',remote_filename)
         self.client.upload(remote_filename,filename)
-        print('Upload %s to panoseti bin file space successfully!' %filename)
+        self.logger.info('Upload %s to panoseti bin file space successfully!' %filename)
         
     def reboot(self,addr=0x00010100):
         """
@@ -296,7 +328,7 @@ class QuaboSock(object):
     def __init__(self, ip_addr, port):
         """
         Description:
-            The constructor of PktRecv class.
+            The constructor of QuaboSock class.
         Inputs:
             - ip_addr(str): the ip address of the quabo.
             - port(int): the port number.
@@ -304,8 +336,9 @@ class QuaboSock(object):
         self.ip_addr = ip_addr
         self.port = port
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        self.sock.bind((self.ip_addr, self.port))
         self.sock.settimeout(0.5)
+        #self.sock.bind((self.ip_addr, self.port))
+        self.sock.bind(("", self.port))
 
     def recv(self, len):
         """
@@ -406,7 +439,7 @@ class QuaboConfig(QuaboSock):
         'NO_BASELINE_SUBTRACT'  : 0x10
     }
     
-    def __init__(self, ip_addr, quabo_config_file = 'configs/quabo_config.json'):
+    def __init__(self, ip_addr, quabo_config_file = 'configs/quabo_config.json', logger='QuaboAutoTest'):
         """
         Description:
             The constructor of QuaboConfig class.
@@ -416,25 +449,22 @@ class QuaboConfig(QuaboSock):
             - ip_config_file(str): the file path of the ip config file.
         """
         # create logger
-        self.logger = logging.getLogger('QuaboAutoTest.QuaboConfig')
+        self.logger = logging.getLogger('%s.QuaboConfig'%logger)
         self.logger.info('Quabo IP - %s'%ip_addr)
-        # get ip
-        self.ip_addr = ip_addr
-        # create a socket
-        self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        self.sock.settimeout(0.5)
-        self.sock.bind("", QuaboConfig.PORTS['CMD'])
+        # call the parent constructor
+        super().__init__(ip_addr, QuaboConfig.PORTS['CMD'])
         # get quabo config
         self.quabo_config_file = quabo_config_file
         with open(self.quabo_config_file) as f:
             self.quabo_config = json.load(f)
 
-        self.shutter_open = 0
-        self.shutter_power = 0
-        self.fanspeed = 0
-        self.MAROC_regs = []
+        # global parameters for the class, which are not exposed to users.
+        self._shutter_open = 0
+        self._shutter_power = 0
+        self._fanspeed = 0
+        self._MAROC_regs = []
         for i in range (4):
-            self.MAROC_regs.append([0 for x in range(104)])
+            self._MAROC_regs.append([0 for x in range(104)])
 
     def send(self, cmd):
         """
@@ -513,7 +543,6 @@ class QuaboConfig(QuaboSock):
         if params.do_flash:
             self.logger.info('Flash LED is on')
             cmd[22] = params.flash_rate
-            self.logger.debug('Flash rate id is %d'%)
             self.logger.debug('Flash rate is %d (%d Hz)'%(params.flash_rate, \
                                                           LSBParams['flash']['rate'][params.flash_rate]))
             cmd[24] = params.flash_level
@@ -633,15 +662,15 @@ class QuaboConfig(QuaboSock):
             mask = (mask | 0x1)
         mask = mask << shift
 
-        self.MAROC_regs[chip][byte_pos] = self.MAROC_regs[chip][byte_pos] & ((~mask) & 0xff)
-        self.MAROC_regs[chip][byte_pos] = self.MAROC_regs[chip][byte_pos] | ((value << shift) & 0xff)
+        self._MAROC_regs[chip][byte_pos] = self._MAROC_regs[chip][byte_pos] & ((~mask) & 0xff)
+        self._MAROC_regs[chip][byte_pos] = self._MAROC_regs[chip][byte_pos] | ((value << shift) & 0xff)
         #if field spans a byte boundary
         if ((shift + field_width) > 8):
-            self.MAROC_regs[chip][byte_pos + 1] = self.MAROC_regs[chip][byte_pos + 1] & ((~(mask>>8)) & 0xff)
-            self.MAROC_regs[chip][byte_pos + 1] = self.MAROC_regs[chip][byte_pos + 1] | (((value >> (8-shift))) & 0xff)
+            self._MAROC_regs[chip][byte_pos + 1] = self._MAROC_regs[chip][byte_pos + 1] & ((~(mask>>8)) & 0xff)
+            self._MAROC_regs[chip][byte_pos + 1] = self._MAROC_regs[chip][byte_pos + 1] | (((value >> (8-shift))) & 0xff)
         if ((shift + field_width) > 16):
-            self.MAROC_regs[chip][byte_pos + 2] = self.MAROC_regs[chip][byte_pos + 2] & ((~(mask>>16)) & 0xff)
-            self.MAROC_regs[chip][byte_pos + 2] = self.MAROC_regs[chip][byte_pos + 2] | (((value >> (16-shift))) & 0xff)
+            self._MAROC_regs[chip][byte_pos + 2] = self._MAROC_regs[chip][byte_pos + 2] & ((~(mask>>16)) & 0xff)
+            self._MAROC_regs[chip][byte_pos + 2] = self._MAROC_regs[chip][byte_pos + 2] | (((value >> (16-shift))) & 0xff)
 
     def _set_bits_4(self, tag, vals, lsb_pos, field_width):
         """
@@ -894,10 +923,10 @@ class QuaboConfig(QuaboSock):
                 self.logger.debug('GAIN%02d: %d, %d, %d ,%d'%(chan, vals_revbits[0], vals_revbits[1],
                                                                vals_revbits[2], vals_revbits[3]))
             for ii in range(104):
-                cmd[ii+4] = self.MAROC_regs[0][ii]
-                cmd[ii+132] = self.MAROC_regs[1][ii]
-                cmd[ii+260] = self.MAROC_regs[2][ii]
-                cmd[ii+388] = self.MAROC_regs[3][ii]
+                cmd[ii+4] = self._MAROC_regs[0][ii]
+                cmd[ii+132] = self._MAROC_regs[1][ii]
+                cmd[ii+260] = self._MAROC_regs[2][ii]
+                cmd[ii+388] = self._MAROC_regs[3][ii]
 
     def SetMarocParams(self):
         """
@@ -1063,7 +1092,7 @@ class QuaboConfig(QuaboSock):
         self.logger.debug('MONCHAN: %d'%cmd[12])
         cmd[13] = (acq['MONCHAN'] >> 8) & 0xff
         cmd[14] = acq['STIMON'] & 0x01
-        self.logger.debug('STIMON: %d'cmd[14])
+        self.logger.debug('STIMON: %d'%cmd[14])
         cmd[15] = 0
         cmd[16] = acq['STIM_LEVEL'] & 0xff
         self.logger.debug('STIM_LEVEL: %d'%cmd[16])
@@ -1137,8 +1166,8 @@ class QuaboConfig(QuaboSock):
         cmd = self.make_cmd(0x05)
         cmd[4] = steps & 0xff
         cmd[5] = (steps >> 8)&0xff
-        cmd[6] = self.shutter_open | (self.shutter_power<<1)
-        cmd[8] = self.fanspeed
+        cmd[6] = self._shutter_open | (self._shutter_power<<1)
+        cmd[8] = self._fanspeed
         cmd[10] = endzone & 0xff
         cmd[11] = (endzone>>8) & 0xff
         cmd[12] = backoff & 0xff
@@ -1160,16 +1189,16 @@ class QuaboConfig(QuaboSock):
         # TODO: Do we still use this command?
         self.logger.info('set shutter: status - %d'%closed)
         cmd = self.make_cmd(0x05)
-        self.shutter_open = 0 if closed else 1
-        self.shutter_power = 1
-        cmd[6] = self.shutter_open | (self.shutter_power<<1)
-        cmd[8] = self.fanspeed
+        self._shutter_open = 0 if closed else 1
+        self._shutter_power = 1
+        cmd[6] = self._shutter_open | (self._shutter_power<<1)
+        cmd[8] = self._fanspeed
         self.send(cmd)
         time.sleep(1)
-        self.shutter_open = 0
-        self.shutter_power = 0
-        cmd[6] = self.shutter_open | (self.shutter_power<<1)
-        cmd[8] = self.fanspeed
+        self._shutter_open = 0
+        self._shutter_power = 0
+        cmd[6] = self._shutter_open | (self._shutter_power<<1)
+        cmd[8] = self._fanspeed
         self.send(cmd)
 
     def SetFan(self, fanspeed):     # fanspeed is 0..15
@@ -1182,10 +1211,10 @@ class QuaboConfig(QuaboSock):
         """
         self.logger.info('set fan: fanspeed - %d'%fanspeed)
         # TODO: we don't have enough information about this command??
-        self.fanspeed = fanspeed
+        self._fanspeed = fanspeed
         cmd = self.make_cmd(0x85)
-        cmd[6] = self.shutter_open | (self.shutter_power<<1)
-        cmd[8] = self.fanspeed
+        cmd[6] = self._shutter_open | (self._shutter_power<<1)
+        cmd[8] = self._fanspeed
         self.send(cmd)
         time.sleep(1)
         self.flush_rx_buf()
@@ -1295,7 +1324,7 @@ class HKRecv(QuaboSock):
     PORTS = {
         'HK' : 60002
     }
-    def __init__(self, ip_addr):
+    def __init__(self, ip_addr, logger='QuaboAutoTest'):
         """
         Description:
             The constructor of HKRecv class.
@@ -1303,7 +1332,7 @@ class HKRecv(QuaboSock):
             - ip_addr(str): the ip address of the quabo.
         """
         super().__init__(ip_addr, HKRecv.PORTS['HK'])
-        self.logger = logging.getLogger('Quabo-Autotest.HKRecv')
+        self.logger = logging.getLogger('%s.HKRecv'%logger)
         self.logger.info('Init HKRecv class - IP: %s'%ip_addr)
         self.logger.info('Init HKRecv class - PORT: %d'%HKRecv.PORTS['HK'])
     
@@ -1318,7 +1347,7 @@ class DataRecv(QuaboSock):
     PORTS = {
         'DATA' : 60001
     }
-    def __init__(self, ip_addr, port):
+    def __init__(self, ip_addr, logger='QuaboAutoTest'):
         """
         Description:
             The constructor of DataRecv class.
@@ -1326,27 +1355,10 @@ class DataRecv(QuaboSock):
             - ip_addr(str): the ip address of the quabo.
             - port(int): the port number.
         """
-        super().__init__(ip_addr, port)
-        self.logger = logging.getLogger('Quabo-Autotest.DataRecv')
+        super().__init__(ip_addr, DataRecv.PORTS['DATA'])
+        self.logger = logging.getLogger('%s.DataRecv'%logger)
         self.logger.info('Init DataRecv class - IP: %s'%ip_addr)
         self.logger.info('Init DataRecv class - PORT: %d'%port)
-
-def CreateLogger(uid):
-    """
-    Description:
-        create a logger for the quabo autotest.
-    Inputs:
-        - uid(str): the unique id of the quabo.
-    Outputs:
-        - logger(logging.Logger): the logger object.
-    """
-    logger = logging.getLogger('Quabo-Autotest')
-    logger.setLevel(logging.DEBUG)
-    handler = logging.FileHandler('logs/Quabo-%s.log'%uid, mode='w')
-    logformat = logging.Formatter('%(levelname)s - %(asctime)s - %(name)s - %(message)s')
-    handler.setFormatter(logformat)
-    logger.addHandler(handler)
-    return logger
 
 if __name__ == '__main__':
     # get the quabo ip
@@ -1362,5 +1374,5 @@ if __name__ == '__main__':
     quabo = tftpw(quabo_ip['ip'])
     uid = quabo.get_flashuid()
     # create a logger, and the file handler name is based on the uid
-    logger = CreateLogger(uid)
+    logger = Util.create_logger('logs/Quabo-%s.log'%uid)
     logger.info('Start quabo autotest - UID: %s'%uid)
