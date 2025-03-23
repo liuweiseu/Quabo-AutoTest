@@ -1331,18 +1331,36 @@ class DataRecv(QuaboSock):
         self.logger.info('Init DataRecv class - IP: %s'%ip_addr)
         self.logger.info('Init DataRecv class - PORT: %d'%port)
 
-if __name__ == '__main__':
-    # get the quabo ip
-    with open('configs/quabo_ip.json') as f:
-        quabo_ip = json.load(f)
-    # ping the quabo first
-    # get the flash uid
-    quabo = tftpw(quabo_ip['ip'])
-    uid = quabo.get_flashuid()
-    # create a logger, and the file handler name is based on the uid
+def CreateLogger(uid):
+    """
+    Description:
+        create a logger for the quabo autotest.
+    Inputs:
+        - uid(str): the unique id of the quabo.
+    Outputs:
+        - logger(logging.Logger): the logger object.
+    """
     logger = logging.getLogger('Quabo-Autotest')
     logger.setLevel(logging.DEBUG)
     handler = logging.FileHandler('logs/Quabo-%s.log'%uid, mode='w')
     logformat = logging.Formatter('%(levelname)s - %(asctime)s - %(name)s - %(message)s')
     handler.setFormatter(logformat)
     logger.addHandler(handler)
+    return logger
+
+if __name__ == '__main__':
+    # get the quabo ip
+    with open('configs/quabo_ip.json') as f:
+        quabo_ip = json.load(f)
+    # ping the quabo first
+    print('ping quabo: %s'%quabo_ip['ip'])
+    status = Util.ping(quabo_ip['ip'])
+    if status == False:
+        print('Quabo is not reachable.')
+        exit(1)
+    # get the flash uid
+    quabo = tftpw(quabo_ip['ip'])
+    uid = quabo.get_flashuid()
+    # create a logger, and the file handler name is based on the uid
+    logger = CreateLogger(uid)
+    logger.info('Start quabo autotest - UID: %s'%uid)

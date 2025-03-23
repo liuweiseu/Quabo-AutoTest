@@ -1,5 +1,6 @@
 *.ipynb
 .ipynb_checkpoints/*
 __pycache__/*
-logs/*
+logs/*.log
+logs/.ipynb_checkpoints/*
 flashuid
