@@ -13,6 +13,7 @@ import os
 from ping3 import ping
 import logging
 import numpy as np
+from datetime import datetime
 
 # The LSBParams describes the map of the code ids to the real settings.
 # All of the info is from the PANOSETI wiki:
@@ -26,23 +27,248 @@ LSBParams = {
         'rate': np.array([1, 95, 191, 381, 763, 1526, 3052, 6104]),
         'level': 312/10**-3,
         'width': 1.5*10 
-    },
-    'hk':{
-        'hvmon': 1.209361*10**-3,
-        'hvimon': 38.147*10**-9,    # (65535-N)*hvimon
-        'v12mon': 9.07*10**-6,
-        'v18mon': 38.14*10**-6,
-        'v33mon': 76.2*10**-6,
-        'v37mon': 76.2*10**-6,
-        'i10mon': 182*10**-6,
-        'i18mon': 37.8*10**-6,
-        'i33mon': 37.8*10**-6,
-        'det_temp': 0.25,
-        'fpga_temp': 1/130.04,      # N*fpga_temp - 273.15
-        'vccintmon': 3/65536,
-        'vccauxmon': 3/65536
     }
 }
+
+# The DType defines the data type to format type used for struct.unpack
+DType = {
+    'byte': {
+        'flag': 'b',
+        'size': 1
+    },
+    'ubyte': {
+        'flag': 'B',
+        'size': 1
+    },
+    'short': {
+        'flag': 'h',
+        'size': 2
+    },
+    'ushort': {
+        'flag': 'H',
+        'size': 2
+    },
+    'int': {
+        'flag': 'i',
+        'size': 4
+    },
+    'uint': {
+        'flag': 'I',
+        'size': 4
+    },
+    'long': {
+        'flag': 'l',
+        'size': 8
+    },
+    'ulong': {
+        'flag': 'L',
+        'size': 8
+    },
+    'longlong': {
+        'flag': 'q',
+        'size': 8       # TODO: is this correct?
+    },
+    'ulonglong': {
+        'flag': 'Q',
+        'size': 8       # TODO: is this correct?
+    },
+    'float': {
+        'flag': 'f',
+        'size': 4
+    },
+    'double': {
+        'flag': 'd',
+        'size': 8
+    },
+    'string': {
+        'flag': 's',
+        'size': 1
+    },
+    'char': {
+        'flag': 'c',
+        'size': 1
+    },
+    'bool': {
+        'flag': '?',
+        'size': 1
+    }
+}
+
+# The HKPktDef is used to define the HK packet structure.
+# The key is the filed name, and the value is the byte offset and the length in the HK packet.
+# All of the info is from the PANOSETI wiki:
+# https://github.com/panoseti/panoseti/wiki/Quabo-packet-interface#housekeeping-packet-64-bytes
+HKPktDef = {
+    'tag': {
+        'offset': 0,
+        'length': 1,
+        'type': 'byte'   
+    },
+    'boardloc': {
+        'offset': 2,
+        'length': 2,
+        'type': 'ushort'
+    },
+    'hvmon0': {
+        'offset': 4,
+        'length': 2,
+        'type': 'ushort',
+        'lsb': -1.209361*10**-3
+    },
+    'hvmon1': {
+        'offset': 6,
+        'length': 2,
+        'type': 'ushort',
+        'lsb': -1.209361*10**-3
+    },
+    'hvmon2':  {
+        'offset': 8,
+        'length': 2,
+        'type': 'ushort',
+        'lsb': -1.209361*10**-3
+    },
+    'hvmon3':  {
+        'offset': 10,
+        'length': 2,
+        'type': 'ushort',
+        'lsb': -1.209361*10**-3
+    },
+    'hvimon0': {
+        'offset': 12,
+        'length': 2,
+        'type': 'ushort',
+        'lsb': -38.147*10**-9,    # (65535-N)*hvimon
+        'constant': 65536*38.147*10**-9
+    },
+    'hvimon1': {
+        'offset': 14,
+        'length': 2,
+        'type': 'ushort',
+        'lsb': -38.147*10**-9,    # (65535-N)*hvimon
+        'constant': 65536*38.147*10**-9
+    },
+    'hvimon2': {
+        'offset': 16,
+        'length': 2,
+        'type': 'ushort',
+        'lsb': -38.147*10**-9,    # (65535-N)*hvimon
+        'constant': 65536*38.147*10**-9
+    },
+    'hvimon3': {
+        'offset': 18,
+        'length': 2,
+        'type': 'ushort',
+        'lsb': -38.147*10**-9,    # (65535-N)*hvimon
+        'constant': 65536*38.147*10**-9
+    },
+    'rawhvmon': {
+        'offset': 20,
+        'length': 2,
+        'type': 'ushort',
+        'lsb':-1.209361*10**-3
+    },
+    'v12mon': {
+        'offset': 22,
+        'length': 2,
+        'type': 'ushort',
+        'lsb': 19.07*10**-6
+    },
+    'v18mon': {
+        'offset': 24,
+        'length': 2,
+        'type': 'ushort',
+        'lsb': 38.14*10**-6
+    },
+    'v33mon': {
+        'offset': 26,
+        'length': 2,
+        'type': 'ushort',
+        'lsb': 76.2*10**-6
+    },
+    'v37mon': {
+        'offset': 28,
+        'length': 2,
+        'type': 'ushort',
+        'lsb': 76.2*10**-6
+    },
+    'i10mon': {
+        'offset': 30,
+        'length': 2,
+        'type': 'ushort',
+        'lsb': 182*10**-6
+    },
+    'i18mon': {
+        'offset': 32,
+        'length': 2,
+        'type': 'ushort',
+        'lsb': 37.8*10**-6
+    },
+    'i33mon': {
+        'offset': 34,
+        'length': 2,
+        'type': 'ushort',
+        'lsb': 37.8*10**-6
+    },
+    'det_temp': {
+        'offset': 36,
+        'length': 2,
+        'type': 'ushort',
+        'lsb': 0.25
+    },
+    'fpga_temp': {
+        'offset': 38,
+        'length': 2,
+        'type': 'ushort',
+        'lsb': 1/130.04,
+        'constant': -273.15 # N*fpga_temp - 273.15
+    },
+    'vccint': {
+        'offset': 40,
+        'length': 2,
+        'type': 'ushort',
+        'lsb': 3/65536
+    },
+    'vccaux': {
+        'offset': 42,
+        'length': 2,
+        'type': 'ushort',
+        'lsb': 3/65536
+    },
+    'uid': {
+        'offset': 44,
+        'length': 8,
+        'type': 'ulong'
+    },
+    'shutter_status': {
+        'offset': 52,
+        'length': 1,
+        'type': 'byte',
+        'bit': 0
+    },
+    'sensor_status': {
+        'offset': 52,
+        'length': 1,
+        'type': 'byte',
+        'bit': 1
+    },
+    'pcbrev': {
+        'offset': 53,
+        'length': 1,
+        'type': 'byte',
+        'bit': 0
+    },
+    'fwtime':{
+        'offset': 56,
+        'length': 4,
+        'type': 'uint'
+    },
+    'fwver': {
+        'offset': 60,
+        'length': 4,
+        'type': 'string'
+    }
+}
+
 
 class Util(object):
     """
@@ -351,8 +577,8 @@ class QuaboSock(object):
         self.port = port
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self.sock.settimeout(0.5)
-        #self.sock.bind((self.ip_addr, self.port))
         self.sock.bind(("", self.port))
+        #self.sock.bind((self.ip_addr, self.port))
 
     def recv(self, len):
         """
@@ -1338,6 +1564,7 @@ class HKRecv(QuaboSock):
     PORTS = {
         'HK' : 60002
     }
+    PKTLEN = 64
     def __init__(self, ip_addr, logger='QuaboAutoTest'):
         """
         Description:
@@ -1347,11 +1574,86 @@ class HKRecv(QuaboSock):
         """
         super().__init__(ip_addr, HKRecv.PORTS['HK'])
         self.logger = logging.getLogger('%s.HKRecv'%logger)
+        self.logger.setLevel(logging.DEBUG)
         self.logger.info('Init HKRecv class - IP: %s'%ip_addr)
         self.logger.info('Init HKRecv class - PORT: %d'%HKRecv.PORTS['HK'])
+        self.hkdata = None
+        self.timestamp = None
     
-    def FirmwareVersion(self):
-        pass
+    def RecvHKData(self):
+        """
+        Description:
+            receive the housekeeping data from the quabo.
+        """
+        self.logger.info('receive HK data')
+        reply, addr = self.sock.recvfrom(HKRecv.PKTLEN)
+        if addr[0] != self.ip_addr:
+            self.hkdata = None
+            return None, None
+        timestamp = datetime.now()
+        self.logger.debug('HK data received at %s'%timestamp.strftime('%Y-%m-%d %H:%M:%S'))
+        bytesback = reply
+        self.hkdata = bytesback
+        self.timestamp = timestamp.timestamp()
+
+    def ParseHK(self):
+        """
+        Description:
+            parse the housekeeping data.
+        """
+        self.logger.info('parse HK data')
+        if self.hkdata is None:
+            return None
+        # parse the housekeeping data here
+        hk_data = {}
+        hk_data['timestamp'] = self.timestamp
+        for k, v in HKPktDef.items():
+            offset = v['offset']
+            length = v['length']
+            flag = DType[v['type']]['flag']
+            size = DType[v['type']]['size']
+            dtype = '%d%s'%(length/size, flag)
+            d = self.hkdata[offset:offset+length]
+            # deal with some special cases
+            if k == 'uid' or k == 'fwtime':
+                r = struct.unpack(dtype, d)[0]
+                self.logger.debug('%s: %s'%(k, hex(r)))
+                hk_data[k] = r
+                continue
+            if k == 'fwver':
+                r = struct.unpack(dtype, d)[0].decode('utf-8')[::-1]
+                self.logger.debug('%s: %s'%(k, r))
+                continue
+            if k == 'boardloc':
+                r = struct.unpack(dtype, d)[0]
+                hk_data[k] = '192.168.%d.%d'%(r>>8, r&0xff)
+                self.logger.debug('%s: %s'%(k, hk_data[k]))
+                continue
+            # for other cases
+            # not all of the structs have lsb, constant, bit
+            try:
+                lsb = v['lsb']
+            except:
+                lsb = 1
+            try:
+                constant = v['constant']
+            except:
+                constant = 0
+            try:
+                bit = v['bit']
+            except:
+                bit = None
+            # start to parse hk data
+            if length == 1 and bit is None:
+                hk_data[k] = self.hkdata[offset]
+            elif length == 1 and bit is not None:
+                hk_data[k] = (self.hkdata[offset] >> bit) & 0x01
+            else:
+                r = struct.unpack(dtype, d)[0]
+                self.logger.debug('k: %s, r: %d, lsb: %.2f, constant: %d'%(k, r, lsb, constant))
+                hk_data[k] = r * lsb + constant
+            self.logger.debug('%s: %s'%(k, hk_data[k]))
+        return hk_data
 
 class DataRecv(QuaboSock):
     """
@@ -1390,3 +1692,10 @@ if __name__ == '__main__':
     # create a logger, and the file handler name is based on the uid
     logger = Util.create_logger('logs/Quabo-%s.log'%uid)
     logger.info('Start quabo autotest - UID: %s'%uid)
+    # reboot the quabo
+    logger.info('Rebooting Quabo...')
+    quabo.reboot()
+    if status == False:
+        print('Quabo is not reachable.')
+        exit(1)
+    logger.info('Quabo Rebooted successfully')
