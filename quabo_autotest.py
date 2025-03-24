@@ -269,6 +269,47 @@ HKPktDef = {
     }
 }
 
+# The DaqPktDef is used to define the Moive/PH packet structure.
+# The key is the filed name, and the value is the byte offset and the length in the HK packet.
+# All of the info is from the PANOSETI wiki:
+# https://github.com/panoseti/panoseti/wiki/Quabo-packet-interface#science-packets
+DaqPktDef = {
+    'acq_mode': {
+        'offset': 0,
+        'length': 1,
+        'type': 'byte'
+    },
+    'packet_ver': {
+        'offset': 1,
+        'length': 1,
+        'type': 'byte'
+    },
+    'packet_no': {
+        'offset': 2,
+        'length': 2,
+        'type': 'ushort'
+    },
+    'boardloc': {
+        'offset': 4,
+        'length': 2,
+        'type': 'ushort'
+    },
+    'tai': {
+        'offset': 6,
+        'length': 4,
+        'type': 'uint'
+    },
+    'nanosec': {
+        'offset': 10,
+        'length': 4,
+        'type': 'uint'
+    },
+    'data': {
+        'offset': 16,
+        'length': -1,  # variable length
+        'type': 'byte'
+    }
+}
 
 class Util(object):
     """
@@ -565,7 +606,7 @@ class QuaboSock(object):
     Description:
         The QuaboSock class is used to receive the packets from the quabo.
     """
-    def __init__(self, ip_addr, port):
+    def __init__(self, ip_addr, port, timeout = 3):
         """
         Description:
             The constructor of QuaboSock class.
@@ -576,7 +617,7 @@ class QuaboSock(object):
         self.ip_addr = ip_addr
         self.port = port
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        self.sock.settimeout(0.5)
+        self.sock.settimeout(timeout)
         self.sock.bind(("", self.port))
         #self.sock.bind((self.ip_addr, self.port))
 
@@ -1565,7 +1606,7 @@ class HKRecv(QuaboSock):
         'HK' : 60002
     }
     PKTLEN = 64
-    def __init__(self, ip_addr, logger='QuaboAutoTest'):
+    def __init__(self, ip_addr, timeout=3,logger='QuaboAutoTest'):
         """
         Description:
             The constructor of HKRecv class.
@@ -1577,43 +1618,50 @@ class HKRecv(QuaboSock):
         self.logger.setLevel(logging.DEBUG)
         self.logger.info('Init HKRecv class - IP: %s'%ip_addr)
         self.logger.info('Init HKRecv class - PORT: %d'%HKRecv.PORTS['HK'])
-        self.hkdata = None
+        self.data = None
         self.timestamp = None
     
-    def RecvHKData(self):
+    def RecvData(self):
         """
         Description:
             receive the housekeeping data from the quabo.
         """
         self.logger.info('receive HK data')
-        reply, addr = self.sock.recvfrom(HKRecv.PKTLEN)
+        try:
+            reply, addr = self.sock.recvfrom(HKRecv.PKTLEN)
+        except Exception as e:
+            self.logger.error('Error receiving HK data: %s'%e)
         if addr[0] != self.ip_addr:
-            self.hkdata = None
+            self.data = None
             return None, None
         timestamp = datetime.now()
         self.logger.debug('HK data received at %s'%timestamp.strftime('%Y-%m-%d %H:%M:%S'))
         bytesback = reply
-        self.hkdata = bytesback
+        self.data = bytesback
         self.timestamp = timestamp.timestamp()
+        return self.data, self.timestamp
 
-    def ParseHK(self):
+    def ParseData(self, data, timestamp):
         """
         Description:
             parse the housekeeping data.
+        Inputs:
+            - data(bytearray): the data received from the quabo.
+            - timestamp(float): the timestamp of the data received.
         """
         self.logger.info('parse HK data')
-        if self.hkdata is None:
+        if data is None:
             return None
         # parse the housekeeping data here
         hk_data = {}
-        hk_data['timestamp'] = self.timestamp
+        hk_data['timestamp'] = timestamp
         for k, v in HKPktDef.items():
             offset = v['offset']
             length = v['length']
             flag = DType[v['type']]['flag']
             size = DType[v['type']]['size']
             dtype = '%d%s'%(length/size, flag)
-            d = self.hkdata[offset:offset+length]
+            d = data[offset:offset+length]
             # deal with some special cases
             if k == 'uid' or k == 'fwtime':
                 r = struct.unpack(dtype, d)[0]
@@ -1645,12 +1693,12 @@ class HKRecv(QuaboSock):
                 bit = None
             # start to parse hk data
             if length == 1 and bit is None:
-                hk_data[k] = self.hkdata[offset]
+                hk_data[k] = data[offset]
             elif length == 1 and bit is not None:
-                hk_data[k] = (self.hkdata[offset] >> bit) & 0x01
+                hk_data[k] = (data[offset] >> bit) & 0x01
             else:
                 r = struct.unpack(dtype, d)[0]
-                self.logger.debug('k: %s, r: %d, lsb: %.2f, constant: %d'%(k, r, lsb, constant))
+                self.logger.debug('k: %s, r: %d, constant: %d'%(k, r, constant))
                 hk_data[k] = r * lsb + constant
             self.logger.debug('%s: %s'%(k, hk_data[k]))
         return hk_data
@@ -1663,18 +1711,62 @@ class DataRecv(QuaboSock):
     PORTS = {
         'DATA' : 60001
     }
-    def __init__(self, ip_addr, logger='QuaboAutoTest'):
+    PKTLEN = {
+         '8bit': 272,
+         '16bit': 528    
+    }
+    def __init__(self, ip_addr, timeout=0.5, logger='QuaboAutoTest'):
         """
         Description:
             The constructor of DataRecv class.
         Inputs:
             - ip_addr(str): the ip address of the quabo.
-            - port(int): the port number.
+            - timeout(float): the timeout for receiving data.
+            - logger(str): the logger name.
         """
         super().__init__(ip_addr, DataRecv.PORTS['DATA'])
         self.logger = logging.getLogger('%s.DataRecv'%logger)
         self.logger.info('Init DataRecv class - IP: %s'%ip_addr)
         self.logger.info('Init DataRecv class - PORT: %d'%port)
+        self.data = None
+        self.timestamp = None
+
+    def RecvData(self, mode='16bit'):
+        """
+        Description:
+            receive the data from the quabo.
+        Inputs:
+            - mode(str): the mode of the data, '8bit' or '16bit'.
+        """
+        self.logger.info('receive HK data')
+        try:
+            reply, addr = self.sock.recvfrom(DataRecv.PKTLEN[mode])
+        except Exception as e:
+            self.logger.error('Error receiving Science data: %s'%e)
+        if addr[0] != self.ip_addr:
+            self.data = None
+            return None, None
+        timestamp = datetime.now()
+        self.logger.debug('Science data received at %s'%timestamp.strftime('%Y-%m-%d %H:%M:%S'))
+        bytesback = reply
+        self.data = bytesback
+        self.timestamp = timestamp.timestamp()
+        return self.data, self.timestamp
+
+    def ParseData(self, data, timestamp):
+        """
+        Description:
+            parse the data received from the quabo.
+        Inputs:
+            - data(bytearray): the data received from the quabo.
+            - timestamp(float): the timestamp of the data received.
+        """
+        self.logger.info('parse science data')
+        if data is None:
+            return None
+        # parse the data here
+        sci_data = {}
+        sci_data['timestamp'] = timestamp
 
 if __name__ == '__main__':
     # get the quabo ip
