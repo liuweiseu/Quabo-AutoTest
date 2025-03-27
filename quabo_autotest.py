@@ -1660,7 +1660,7 @@ class HKRecv(QuaboSock):
             length = v['length']
             flag = DType[v['type']]['flag']
             size = DType[v['type']]['size']
-            dtype = '%d%s'%(length/size, flag)
+            dtype = '>%d%s'%(length/size, flag)
             d = data[offset:offset+length]
             # deal with some special cases
             if k == 'uid' or k == 'fwtime':
@@ -1767,6 +1767,16 @@ class DataRecv(QuaboSock):
         # parse the data here
         sci_data = {}
         sci_data['timestamp'] = timestamp
+        for k,v in DaqPktDef.items():
+            offset = v['offset']
+            length = v['length']
+            flag = DType[v['type']]['flag']
+            size = DType[v['type']]['size']
+            d = data[offset:offset+length]
+            length = len(d)
+            dtype = '>%d%s'%(length/size, flag)
+            sci_data[k] = struct.unpack(dtype, d)# deal with some special cases 
+        return sci_data
 
 if __name__ == '__main__':
     # get the quabo ip
