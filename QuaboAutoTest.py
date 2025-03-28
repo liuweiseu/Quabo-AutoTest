@@ -19,7 +19,7 @@ from datetime import datetime
 # All of the info is from the PANOSETI wiki:
 # https://github.com/panoseti/panoseti/wiki/Quabo-packet-interface
 LSBParams = {
-    'hv_setting': -1.14/10**-3,
+    'hv_setting': -1.14*10**-3,
     'stim': {
         'rate': 100*10**6/np.array([19, 18, 17, 16, 15, 14, 13, 12])
     },
@@ -733,7 +733,11 @@ class QuaboConfig(QuaboSock):
         self.logger = logging.getLogger('%s.QuaboConfig'%logger)
         self.logger.info('Quabo IP - %s'%ip_addr)
         # call the parent constructor
-        super().__init__(ip_addr, QuaboConfig.PORTS['CMD'])
+        try:
+            super().__init__(ip_addr, QuaboConfig.PORTS['CMD'])
+        except Exception as e:
+            self.logger.error('Error: %s'%e)
+            print(e)
         # get quabo config
         self.quabo_config_file = quabo_config_file
         with open(self.quabo_config_file) as f:
