@@ -237,7 +237,7 @@ HKPktDef = {
     'uid': {
         'offset': 44,
         'length': 8,
-        'type': 'ulong'
+        'type': 'ulonglong'
     },
     'shutter_status': {
         'offset': 52,
@@ -269,7 +269,7 @@ HKPktDef = {
     }
 }
 
-# The DaqPktDef is used to define the Moive/PH packet structure.
+# The DaqPktDef is used to define the movie/PH packet structure.
 # The key is the filed name, and the value is the byte offset and the length in the HK packet.
 # All of the info is from the PANOSETI wiki:
 # https://github.com/panoseti/panoseti/wiki/Quabo-packet-interface#science-packets
@@ -805,10 +805,10 @@ class QuaboConfig(QuaboSock):
         mode = 0
         if params.do_image:
             mode |= QuaboConfig.ACQ_MODE['IMAGE']
-            self.logger.debug('16Bit Moive Mode')
+            self.logger.debug('16Bit movie Mode')
         if params.image_8bit:
             mode |= QuaboConfig.ACQ_MODE['IMAGE_8BIT']
-            self.logger.debug('8Bit Moive mode')
+            self.logger.debug('8Bit movie mode')
         if params.do_ph:
             mode |= QuaboConfig.ACQ_MODE['PULSE_HEIGHT']
             self.logger.debug('Pulse Height mode')
@@ -858,27 +858,28 @@ class QuaboConfig(QuaboSock):
         self.logger.info('configure PH packets destination IP: %s'%dest_str)
         self.quabo_config['dest_ips']['PH'] = dest_str
     
-    def MoivePktDestConfig(self, dest_str):
+    def moviePktDestConfig(self, dest_str):
         """
         Description:
-            configure the destination IP addr for Moive packets.
+            configure the destination IP addr for movie packets.
         Inputs:
-            - dest_str(str): the dest ip address or hostname for Moive packets.
+            - dest_str(str): the dest ip address or hostname for movie packets.
         """
-        self.logger.info('configure Moive packets destination IP: %s'%dest_str)
-        self.quabo_config['dest_ips']['MOIVE'] = dest_str
+        self.logger.info('configure movie packets destination IP: %s'%dest_str)
+        self.quabo_config['dest_ips']['movie'] = dest_str
 
     def SetDataPktDest(self):
         """
         Description:
-            set destination IP addr for both PH and Moive packets.
+            set destination IP addr for both PH and movie packets.
         Inputs:
-            - dest_str(str): the dest ip address or hostname for PH and Moive packets.
+            - dest_str(str): the dest ip address or hostname for PH and movie packets.
         """
         ips = self.quabo_config['dest_ips']
         ph_ip = ips['PH']
         movie_ip = ips['MOVIE']
-        self.logger.info('set Moive/PH packets destination IPs: %s/%s'%(moive_ip, ph_ip))
+        self.logger.info('set PH packets destination IPs: %s'%ph_ip)
+        self.logger.info('set MOVIE packets destination IPs: %s'%movie_ip)
         # get the IP address from hostname
         ph_ip_addr_str = socket.gethostbyname(ph_ip)
         ph_ip_addr_bytes = Util.ip_addr_str_to_bytes(ph_ip_addr_str)
@@ -890,11 +891,22 @@ class QuaboConfig(QuaboSock):
             cmd[i+5] = movie_ip_addr_bytes[i]
         self.flush_rx_buf()
         self.send(cmd)
-        reply = self.sock.recvfrom(12)
-        bytes = reply[0]
-        count = len(bytes)
+        reply = self.recv(12)
+        count = len(reply)
         if count != 12:
-            return
+            self.logger.error('Error: reply length is %d, but should be 12'%count)
+            return False
+        else:
+            mac_addr = {}
+            mac_addr['PH'] = struct.unpack('6B',reply[0:6])
+            mac_bytes = reply[0:6]
+            mac_ph = ':'.join(['%02x'%x for x in mac_bytes])
+            self.logger.info('PH packets destination MAC: %s'%mac_ph)
+            mac_addr['MOVIE'] = struct.unpack('6B',reply[6:12])
+            mac_bytes = reply[6:12]
+            mac_movie = ':'.join(['%02x'%x for x in mac_bytes])
+            self.logger.info('MOVIE packets destination MAC: %s'%mac_movie)
+            return mac_addr
 
     def HkPacketDestConfig(self, dest_str):
         """
@@ -906,17 +918,16 @@ class QuaboConfig(QuaboSock):
         self.logger.info('configure HK packets destination IP: %s'%dest_str)
         self.quabo_config['dest_ips']['HK'] = dest_str   
 
-    def SetHkPacketDest(self, dest_str):
+    def SetHkPacketDest(self):
         """
         Description:
             set destination IP addr for HK packets.
-        Inputs:
-            - dest_str(str): the dest ip address or hostname for HK packets.
         """
         # get the IP address from hostname
+        dest_str = self.quabo_config['dest_ips']['HK']
         ip_addr_str = socket.gethostbyname(dest_str)
+        self.logger.info('set HK packets destination IP: %s'%ip_addr_str)
         ip_addr_bytes = Util.ip_addr_str_to_bytes(ip_addr_str)
-        self.logger.info('set HK packets destination IP: %s'%ip_addr_bytes)
         cmd = self.make_cmd(0x0b)
         for i in range(4):
             cmd[i+1] = ip_addr_bytes[i]
@@ -971,14 +982,18 @@ class QuaboConfig(QuaboSock):
         self._set_bits(2, lsb_pos, field_width, vals[2])
         self._set_bits(3, lsb_pos, field_width, vals[3])
     
-    def _make_maroc_cmd(self, cmd):
+    def _make_maroc_cmd(self, cmd, echo = 0):
         """
         Description:
             make a maroc command based on the 'maroc' in quabo config.
         Inputs:
             - cmd(bytearray): the command array.
+            - echo(int): the echo enable.
         """
-        cmd[0] = 0x01
+        if echo:
+            cmd[0] = 0x81
+        else:
+            cmd[0] = 0x01
         maroc_config = self.quabo_config['maroc']
         for tag, val in maroc_config.items():
             # Make a list of the should-be 4 ascii values
@@ -1209,16 +1224,42 @@ class QuaboConfig(QuaboSock):
                 cmd[ii+260] = self._MAROC_regs[2][ii]
                 cmd[ii+388] = self._MAROC_regs[3][ii]
 
-    def SetMarocParams(self):
+    def SetMarocParams(self, echo = 1):
         """
         Description:
             send the maroc parameters to the quabo.
+        Inputs:
+            - echo(int): the echo enable.
+        Outputs:
+            - True if the reply is correct, otherwise False.
         """
         self.logger.info('set MAROC parameters')
         cmd = bytearray(492)
         maroc_config = self.quabo_config['maroc']
-        self._make_maroc_cmd(maroc_config, cmd)
+        self._make_maroc_cmd(cmd, echo=echo)
         self.send(cmd)
+        if echo:
+            reply = self.recv(492)
+            count = len(reply)
+            if count != 492:
+                self.logger.error('Error: reply length is %d, but should be 492'%count)
+                return False
+            else:
+                self.logger.info('reply len from MAROC: %d'%count)
+                for i in range(count):
+                    if i >= 108 and i < 132:
+                        continue
+                    if i >= 236 and i < 260:
+                        continue
+                    if i >= 364 and i < 388:
+                        continue
+                    if cmd[i] != reply[i]:
+                        self.logger.error('Error: cmd[%d] = %d, but reply[%d] = %d'%(i, cmd[i], i, reply[i]))
+                        return False
+                self.logger.info('MAROC parameters set successfully')
+                return True
+        else:
+            return True
 
     def MarocParamConfig(self, tag, vals):
         """
@@ -1231,7 +1272,7 @@ class QuaboConfig(QuaboSock):
         self.logger.info('configure Maroc chip: %s - %s'%(tag, vals))
         self.quabo_config['maroc'][tag] = vals
 
-    def SetHv(self, chan = 0b1111):
+    def SetHv(self, status = 'on', chan = 0b1111):
         """
         Description: 
             config the high voltage for the enabled channels.
@@ -1243,16 +1284,25 @@ class QuaboConfig(QuaboSock):
         cmd = self.make_cmd(0x02)
         lsb = LSBParams['hv_setting']
         # set the hv values for the enabled channels
-        for i in range(4):
-            if (chan & (1<<i)):
-                val = self.quabo_config['hv']['HV_%d'%i]
-                cmd[2*i+2] = val & 0xff
-                cmd[2*i+3] = (val>> 8) & 0xff
-                self.logger.debug('HV_%d: %d (%.2f V)'%(i, val, val * lsb))
-            else:
-                cmd[2*i+2] = 0
-                cmd[2*i+3] = 0
-                self.logger.debug('HV_%d: %d (%.2f V)'%(i, 0, 0))
+        if status == 'on':
+            self.logger.info('turn on HV')
+            for i in range(4):
+                if (chan & (1<<i)):
+                    val = self.quabo_config['hv']['HV_%d'%i]
+                    cmd[2*i+2] = val & 0xff
+                    cmd[2*i+3] = (val>> 8) & 0xff
+                    self.logger.debug('HV_%d: %d (%.2f V)'%(i, val, val * lsb))
+                else:
+                    cmd[2*i+2] = 0
+                    cmd[2*i+3] = 0
+                    self.logger.debug('HV_%d: %d (%.2f V)'%(i, 0, 0))
+        elif status == 'off':
+            self.logger.info('turn off HV')
+            for i in range(4):
+                if (chan & (1<<i)):
+                    cmd[2*i+2] = 0
+                    cmd[2*i+3] = 0
+                    self.logger.debug('HV_%d: %d (%.2f V)'%(i, 0, 0))
         self.flush_rx_buf()
         self.send(cmd)
 
@@ -1656,11 +1706,17 @@ class HKRecv(QuaboSock):
         hk_data = {}
         hk_data['timestamp'] = timestamp
         for k, v in HKPktDef.items():
+            self.logger.debug('key: %s'%k)
             offset = v['offset']
+            self.logger.debug('offset: %d'%offset)
             length = v['length']
+            self.logger.debug('length: %d'%length)
             flag = DType[v['type']]['flag']
+            self.logger.debug('flag: %s'%flag)
             size = DType[v['type']]['size']
+            self.logger.debug('size: %d'%size)
             dtype = '>%d%s'%(length/size, flag)
+            self.logger.debug('dtype: %s'%dtype)
             d = data[offset:offset+length]
             # deal with some special cases
             if k == 'uid' or k == 'fwtime':
@@ -1738,7 +1794,7 @@ class DataRecv(QuaboSock):
         Inputs:
             - mode(str): the mode of the data, '8bit' or '16bit'.
         """
-        self.logger.info('receive HK data')
+        self.logger.info('receive science data')
         try:
             reply, addr = self.sock.recvfrom(DataRecv.PKTLEN[mode])
         except Exception as e:
@@ -1767,7 +1823,14 @@ class DataRecv(QuaboSock):
         # parse the data here
         sci_data = {}
         sci_data['timestamp'] = timestamp
+        self.logger.debug('%s: %s'%('timestamp', timestamp))
         for k,v in DaqPktDef.items():
+            # deal with some special cases
+            if k == 'boardloc':
+                r = struct.unpack('>H', data[0:2])[0]
+                sci_data[k] = '192.168.%d.%d'%(r>>8, r&0xff)
+                self.logger.debug('%s: %s'%(k, sci_data[k]))
+                continue
             offset = v['offset']
             length = v['length']
             flag = DType[v['type']]['flag']
@@ -1775,7 +1838,8 @@ class DataRecv(QuaboSock):
             d = data[offset:offset+length]
             length = len(d)
             dtype = '>%d%s'%(length/size, flag)
-            sci_data[k] = struct.unpack(dtype, d)# deal with some special cases 
+            sci_data[k] = struct.unpack(dtype, d)
+            self.logger.debug('%s: %s'%(k, sci_data[k]))
         return sci_data
 
 if __name__ == '__main__':
