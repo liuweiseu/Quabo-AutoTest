@@ -305,9 +305,21 @@ DaqPktDef = {
         'type': 'uint'
     },
     'data': {
-        'offset': 16,
-        'length': -1,  # variable length
-        'type': 'byte'
+        'ph': {
+            'offset': 16,
+            'length': 512,
+            'type': 'short'
+        },
+        'movie-16bit': {
+            'offset': 16,
+            'length': 512,
+            'type': 'ushort'
+        },
+        'movie-8bit': {
+            'offset': 16,
+            'length': 256,
+            'type': 'ubyte'
+        }
     }
 }
 
@@ -815,10 +827,10 @@ class QuaboConfig(QuaboSock):
             self.logger.debug('8Bit movie mode')
         if params.do_ph:
             mode |= QuaboConfig.ACQ_MODE['PULSE_HEIGHT']
-            self.logger.debug('Pulse Height mode')
+            self.logger.debug('pulse height mode')
         if not params.bl_subtract:
             mode |= QuaboConfig.ACQ_MODE['NO_BASELINE_SUBTRACT']
-            self.logger.debug('No baseline subtract')
+            self.logger.debug('no baseline subtract')
         cmd[2] = mode
         cmd[4] = params.image_us % 256
         cmd[5] = params.image_us // 256
@@ -1719,7 +1731,7 @@ class HKRecv(QuaboSock):
             self.logger.debug('flag: %s'%flag)
             size = DType[v['type']]['size']
             self.logger.debug('size: %d'%size)
-            dtype = '>%d%s'%(length/size, flag)
+            dtype = '<%d%s'%(length/size, flag)
             self.logger.debug('dtype: %s'%dtype)
             d = data[offset:offset+length]
             # deal with some special cases
@@ -1731,6 +1743,7 @@ class HKRecv(QuaboSock):
             if k == 'fwver':
                 r = struct.unpack(dtype, d)[0].decode('utf-8')[::-1]
                 self.logger.debug('%s: %s'%(k, r))
+                hk_data[k] = r
                 continue
             if k == 'boardloc':
                 r = struct.unpack(dtype, d)[0]
@@ -1787,7 +1800,7 @@ class DataRecv(QuaboSock):
         super().__init__(ip_addr, DataRecv.PORTS['DATA'])
         self.logger = logging.getLogger('%s.DataRecv'%logger)
         self.logger.info('Init DataRecv class - IP: %s'%ip_addr)
-        self.logger.info('Init DataRecv class - PORT: %d'%port)
+        self.logger.info('Init DataRecv class - PORT: %d'%DataRecv.PORTS['DATA'])
         self.data = None
         self.timestamp = None
 
@@ -1813,13 +1826,14 @@ class DataRecv(QuaboSock):
         self.timestamp = timestamp.timestamp()
         return self.data, self.timestamp
 
-    def ParseData(self, data, timestamp):
+    def ParseData(self, data, timestamp, mode='ph'):
         """
         Description:
             parse the data received from the quabo.
         Inputs:
             - data(bytearray): the data received from the quabo.
             - timestamp(float): the timestamp of the data received.
+            - mode(str): the mode of the data, 'ph' or 'movie-16bit' or 'movie-8bit'.
         """
         self.logger.info('parse science data')
         if data is None:
@@ -1831,18 +1845,33 @@ class DataRecv(QuaboSock):
         for k,v in DaqPktDef.items():
             # deal with some special cases
             if k == 'boardloc':
-                r = struct.unpack('>H', data[0:2])[0]
+                r = struct.unpack('<H', data[0:2])[0]
                 sci_data[k] = '192.168.%d.%d'%(r>>8, r&0xff)
                 self.logger.debug('%s: %s'%(k, sci_data[k]))
+                continue
+            if k == 'data':
+                offset = v[mode]['offset']
+                length = v[mode]['length']
+                flag = DType[v[mode]['type']]['flag']
+                size = DType[v[mode]['type']]['size']
+                d = data[offset:offset+length]
+                dtype = '<%d%s'%(length/size, flag)
+                r = struct.unpack(dtype, d)
+                if mode == 'ph':
+                    sci_data[k] = np.array(r, dtype=np.short)
+                elif mode == 'movie-16bit':
+                    sci_data[k] = np.array(r, dtype=np.ushort)
+                elif mode == 'movie-8bit':
+                    sci_data[k] = np.array(r, dtype=np.ubyte) 
+                self.logger.debug('len(%s): %s'%(k, len(sci_data[k])))
                 continue
             offset = v['offset']
             length = v['length']
             flag = DType[v['type']]['flag']
             size = DType[v['type']]['size']
             d = data[offset:offset+length]
-            length = len(d)
-            dtype = '>%d%s'%(length/size, flag)
-            sci_data[k] = struct.unpack(dtype, d)
+            dtype = '<%d%s'%(length/size, flag)
+            sci_data[k] = struct.unpack(dtype, d)[0]
             self.logger.debug('%s: %s'%(k, sci_data[k]))
         return sci_data
 

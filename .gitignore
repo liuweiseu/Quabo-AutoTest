@@ -4,3 +4,4 @@ __pycache__/*
 logs/*.log
 logs/.ipynb_checkpoints/*
 flashuid
+configs/.ipynb_checkpoints/
