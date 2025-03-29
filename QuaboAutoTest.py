@@ -14,6 +14,7 @@ from ping3 import ping
 import logging
 import numpy as np
 from datetime import datetime
+import time
 
 # The LSBParams describes the map of the code ids to the real settings.
 # All of the info is from the PANOSETI wiki:
@@ -428,16 +429,27 @@ class QuaboTest(object):
     Description:
         The QuaboTest class is used to test the quabo.
     """    
-    def __init__(self, uid):
+    N_PH_PKT = 1000
+    N_MOVIE_PKT = 1000
+    def __init__(self, ip_file='configs/quabo_ip.json', expected_results_file='configs/expected_results.json'):
         """
         Description:
             The constructor of QuaboTest class.
         Inputs:
             - uid(str): the uid of the quabo.
         """
-        self.uid = uid
-        self.logger = Util.create_logger('reports/%d/reports.log'%uid, mode='a', tag='QuaboAutoTest')
-        self.logger.info('Quabo UID - %s'%uid)
+        # get the quabo ip
+        quabo_ip = Util.read_json(ip_file)
+        self.ip = quabo_ip['ip']
+        # create tftpw client
+        self.client = tftpw(self.ip)
+        # read the expected results
+        self.expected_results = Util.read_json(expected_results_file)
+        # get uid
+        self.uid = self.client.get_flashuid()
+        # create logger
+        self.logger = Util.create_logger('reports/%s/reports.log'%self.uid, mode='w', tag='QuaboAutoTest')
+        self.logger.info('Quabo UID - %s'%self.uid)
 
     def CheckResults(self, expected_results, actual_results):
         """
@@ -454,18 +466,228 @@ class QuaboTest(object):
             if v['valid'] == False:
                 continue
             e_val = v['val']
-            e_offset = v['offset']
+            e_offset = v['deviation']
             a_val = actual_results[k]
             if type(e_val) == str:
                 if e_val != a_val:
                     passed = False
-                    self.logger.error('Error: expected val(%s) is not equal to acutal val(%s)'%(e_val, a_val))
+                    self.logger.error('Error: %s - expected val(%s) is not equal to acutal val(%s)'%(k, e_val, a_val))
+                else:
+                    self.logger.info('Info: %s - expected val(%s) is equal to actual val(%s)'%(k, e_val, a_val))
             else:
                 if abs(e_val) - e_offset > abs(a_val) or abs(e_val) + e_offset < abs(a_val):
                     passed = False
-                    self.logger.error('Error: expected val(%s)/offset(%.02f) is not equal to %s'%(k, a_val))
+                    if type(e_val) == int:
+                        if e_offset == 0:
+                            self.logger.error('Error: %s - expected val(%d) is not equal to %d'%(k, e_val, a_val))
+                        else:
+                            self.logger.error('Error: %s - expected val(%d)/deviation(%d) is not equal to %d'%(k, e_val, e_offset, a_val))
+                    elif type(e_val) == float:
+                        if e_offset == 0:
+                            self.logger.error('Error: %s - expected val(%.02f) is not equal to %.02f'%(k, e_val, a_val))
+                        else:
+                            self.logger.error('Error: %s - expected val(%.02f)/deviation(%.02f) is not equal to %.02f'%(k, e_val, e_offset, a_val))
+                else:
+                    if type(e_val) == int:
+                        if e_offset == 0:
+                            self.logger.info('Info: %s - expected val(%d) is equal to actual val(%d)'%(k, e_val, a_val))
+                        else:
+                            self.logger.info('Info: %s - expected val(%d)/deviation(%d) is equal to actual val(%d)'%(k, e_val, e_offset, a_val))
+                    elif type(e_val) == float:
+                        if e_offset == 0:
+                            self.logger.info('Info: %s - expected val(%.02f) is equal to actual val(%.02f)'%(k, e_val, a_val))
+                        else:
+                            self.logger.info('Info: %s - expected val(%.02f)/deviation(%.02f) is equal to actual val(%.02f)'%(k, e_val, e_offset, a_val))
         return passed
 
+    def CheckHKPktVals(self):
+        """
+        Description:
+            Check the HK packets.
+        Outputs:
+            - bool: True if the test passed, False otherwise.
+        """
+        self.logger.info('------------------------------------')
+        self.logger.info('Checking HK Values')
+        self.logger.info('------------------------------------')
+        expected_results = self.expected_results['hk_vals']
+        # config the quabo
+        qc = QuaboConfig(self.ip)
+        # set the HK packet destination
+        qc.SetHkPacketDest()
+        # turn on the high voltage
+        qc.SetHv('on')
+        # wait for a few seconds to let the quabo warm up
+        time.sleep(5)
+        hk = HKRecv(self.ip)
+        hk.RecvData()
+        qc.SetHv('off')
+        qc.close()
+        hk.close()
+        hk.DumpData('reports/%s/hk_vals.npz'%self.uid)
+        hkpkt = hk.ParseData()
+        return self.CheckResults(expected_results, hkpkt[0])
+
+    def CheckHKTimestamp(self):
+        """
+        Description:
+            Check the HK timestamp.
+        """
+        self.logger.info('------------------------------------')
+        self.logger.info('Checking HK Timestamp Difference')
+        self.logger.info('------------------------------------')
+        e_val = self.expected_results['hk_tdiff']['val']
+        e_offset = self.expected_results['hk_tdiff']['deviation']
+        hk = HKRecv(self.ip)
+        hk.RecvData(2)
+        hk.DumpData('reports/%s/hk_timestamp.npz'%self.uid)
+        hkpkt = hk.ParseData()
+        hk.close()
+        # get the time difference
+        a_val = hkpkt[1]['timestamp'] - hkpkt[0]['timestamp']
+        if abs(e_val) - e_offset > abs(a_val) or abs(e_val) + e_offset < abs(a_val):
+            self.logger.error('Error: HK timestamp difference - Expected val(%.02f)/deviation(%.02f) is not equal to %.02f'%(e_val, e_offset, a_val))
+            return False
+        else:
+            self.logger.info('Info: HK timestamp difference - Expected val(%.02f)/deviation(%.02f) is equal to %.02f'%(e_val, e_offset, a_val))
+            return True
+    
+    def CheckMarocConfig(self):
+        """
+        Description:
+            Check the Quabo configuration.
+        Outputs:
+            - bool: True if the test passed, False otherwise.
+        """
+        self.logger.info('------------------------------------')
+        self.logger.info('Checking MAROC Chip Configuration')
+        self.logger.info('------------------------------------')
+        qc = QuaboConfig(self.ip)
+        # we have to set the MAROC params twice
+        r = qc.SetMarocParams()
+        r = qc.SetMarocParams()
+        qc.close()
+        if r:
+            self.logger.info('MAROC Chip is configured correctly')
+        else:
+            self.logger.error('MAROC Chip is not configured correctly')
+        return r
+
+    def CheckDestMac(self):
+        """
+        Description:
+            Check the destination MAC address for PH and Movie pachets.
+        """
+        self.logger.info('------------------------------------')
+        self.logger.info('Checking Destination MAC Address')
+        self.logger.info('------------------------------------')
+        # TODO: implement the check
+        pass
+
+    def CheckPHdata(self):
+        """
+        Description:
+            Check the PH data.
+        Outputs:
+            - bool: True if the test passed, False otherwise.
+        """
+        self.logger.info('------------------------------------')
+        self.logger.info('Checking PH Data')
+        self.logger.info('------------------------------------')
+        expected_results = self.expected_results['ph_data']
+        # config the quabo
+        qc = QuaboConfig(self.ip)
+        # set the PH packet destination
+        qc.SetDataPktDest()
+        # turn on the high voltage
+        qc.SetHv('on')
+        # configure the MAROC parameters
+        qc.SetMarocParams()
+        # set the PH packet mode
+        params = DAQ_PARAMS(do_image=False, image_us=1000, image_8bit=False, do_ph=True,bl_subtract=True)
+        qc.DaqParamsConfig(params)
+        # wait for a few seconds to let the quabo warm up
+        time.sleep(2)
+        ph = DataRecv(self.ip)
+        ph.RecvData(QuaboTest.N_PH_PKT)
+        # turn off the high voltage
+        qc.SetHv('off')
+        # turn off the PH packet mode
+        params = DAQ_PARAMS(do_image=False, image_us=1000, image_8bit=False, do_ph=False,bl_subtract=True)
+        qc.DaqParamsConfig(params)
+        qc.close()
+        ph.close()
+        ph.DumpData('reports/%s/ph_data.npz'%self.uid)
+        phpkt = ph.ParseData()
+        # check the PH data
+        peaks = []
+        for d in phpkt:
+            peaks.append(max(d['data']))
+        peaks = np.array(peaks)
+        peaks_mean = np.mean(peaks)
+        peaks_std = np.std(peaks)
+        peaks_max = np.max(peaks)
+        peaks_min = np.min(peaks)
+        actual_vals = {}
+        actual_vals['mean'] = peaks_mean
+        actual_vals['std'] = peaks_std
+        actual_vals['max'] = peaks_max
+        actual_vals['min'] = peaks_min
+        # check the results
+        return self.CheckResults(expected_results, actual_vals)
+
+    def CheckPHTimestamp(self):
+        """
+        Description:
+            Check the PH timestamp.
+        Outputs:
+            - bool: True if the test passed, False otherwise.
+        """
+        self.logger.info('------------------------------------')
+        self.logger.info('Checking PH Timestamp Difference')
+        self.logger.info('------------------------------------')
+        e_val = self.expected_results['ph_pulse_rate']['val']
+        e_offset = self.expected_results['ph_pulse_rate']['deviation']
+        # config the quabo
+        qc = QuaboConfig(self.ip)
+        # set the PH packet destination
+        qc.SetDataPktDest()
+        # turn on the high voltage
+        qc.SetHv('on')
+        # configure the MAROC parameters
+        qc.SetMarocParams()
+        # set the PH packet mode
+        params = DAQ_PARAMS(do_image=False, image_us=1000, image_8bit=False, do_ph=True,bl_subtract=True)
+        qc.DaqParamsConfig(params)
+        # wait for a few seconds to let the quabo warm up
+        time.sleep(2)
+        ph = DataRecv(self.ip)
+        ph.RecvData(QuaboTest.N_PH_PKT)
+        # turn off the high voltage
+        qc.SetHv('off')
+        # turn off the PH packet mode
+        params = DAQ_PARAMS(do_image=False, image_us=1000, image_8bit=False, do_ph=False,bl_subtract=True)
+        qc.DaqParamsConfig(params)
+        qc.close()
+        ph.close()
+        ph.DumpData('reports/%s/ph_timestamp.npz'%self.uid)
+        phpkt = ph.ParseData()
+        # get the timestamp
+        timestamps = []
+        for d in phpkt:
+            timestamps.append(d['timestamp'])
+        timestamps = np.array(timestamps, dtype=np.float64)
+        timestamps_diff = np.diff(timestamps)
+        a_val = 1/np.mean(timestamps_diff)
+        if abs(e_val) - e_offset > abs(a_val) or abs(e_val) + e_offset < abs(a_val):
+            self.logger.error('Error: PH timestamp difference - Expected val(%.02f)/deviation(%.02f) is not equal to %.02f'%(e_val, e_offset, a_val))
+            return False
+        else:
+            self.logger.info('Info: PH timestamp difference - Expected val(%.02f)/deviation(%.02f) is equal to %.02f'%(e_val, e_offset, a_val))
+            return True
+
+
+    
 class tftpw(object):
     """
     Description:
@@ -800,7 +1022,7 @@ class QuaboConfig(QuaboSock):
         'NO_BASELINE_SUBTRACT'  : 0x10
     }
     
-    def __init__(self, ip_addr, quabo_config_file = 'configs/quabo_config.json', logger='QuaboAutoTest'):
+    def __init__(self, ip_addr, quabo_config_file = 'configs/quabo_config.json', logger='Quabo'):
         """
         Description:
             The constructor of QuaboConfig class.
@@ -1741,14 +1963,14 @@ class HKRecv(QuaboSock):
         'HK' : 60002
     }
     PKTLEN = 64
-    def __init__(self, ip_addr, timeout=3,logger='QuaboAutoTest'):
+    def __init__(self, ip_addr, timeout=3,logger='Quabo'):
         """
         Description:
             The constructor of HKRecv class.
         Inputs:
             - ip_addr(str): the ip address of the quabo.
         """
-        super().__init__(ip_addr, HKRecv.PORTS['HK'])
+        super().__init__(ip_addr, HKRecv.PORTS['HK'],timeout=timeout)
         self.logger = logging.getLogger('%s.HKRecv'%logger)
         self.logger.setLevel(logging.DEBUG)
         self.logger.info('Init HKRecv class - IP: %s'%ip_addr)
@@ -1756,94 +1978,110 @@ class HKRecv(QuaboSock):
         self.data = None
         self.timestamp = None
     
-    def RecvData(self):
+    def RecvData(self, n = 1):
         """
         Description:
             receive the housekeeping data from the quabo.
+        Inputs:
+            - n(int): the number of packets to receive.
         """
         self.logger.info('receive HK data')
-        try:
-            reply, addr = self.sock.recvfrom(HKRecv.PKTLEN)
-        except Exception as e:
-            self.logger.error('Error receiving HK data: %s'%e)
-        if addr[0] != self.ip_addr:
-            self.data = None
-            return None, None
-        timestamp = datetime.now()
-        self.logger.debug('HK data received at %s'%timestamp.strftime('%Y-%m-%d %H:%M:%S'))
-        bytesback = reply
-        self.data = bytesback
-        self.timestamp = timestamp.timestamp()
-        return self.data, self.timestamp
+        self.data = np.zeros(n, dtype=object)
+        self.timestamp = np.zeros(n, dtype=float)
+        for i in range(n):
+            try:
+                recv, addr = self.sock.recvfrom(HKRecv.PKTLEN)
+            except Exception as e:
+                self.logger.error('Error receiving HK data: %s'%e)
+            if addr[0] != self.ip_addr:
+                self.data = None
+                return None, None
+            timestamp = datetime.now()
+            self.logger.debug('HK data received at %s'%timestamp.strftime('%Y-%m-%d %H:%M:%S'))
+            self.data[i] = recv
+            self.timestamp[i] = timestamp.timestamp()
 
-    def ParseData(self, data, timestamp):
+    def ParseData(self):
         """
         Description:
             parse the housekeeping data.
-        Inputs:
-            - data(bytearray): the data received from the quabo.
-            - timestamp(float): the timestamp of the data received.
+        Outputs:
+            - parsed_data(list): the parsed housekeeping data.
         """
+        parsed_data = np.zeros(len(self.data), dtype=object)
         self.logger.info('parse HK data')
-        if data is None:
-            return None
+        for i in range(len(self.data)):
         # parse the housekeeping data here
-        hk_data = {}
-        hk_data['timestamp'] = timestamp
-        for k, v in HKPktDef.items():
-            self.logger.debug('key: %s'%k)
-            offset = v['offset']
-            self.logger.debug('offset: %d'%offset)
-            length = v['length']
-            self.logger.debug('length: %d'%length)
-            flag = DType[v['type']]['flag']
-            self.logger.debug('flag: %s'%flag)
-            size = DType[v['type']]['size']
-            self.logger.debug('size: %d'%size)
-            dtype = '<%d%s'%(length/size, flag)
-            self.logger.debug('dtype: %s'%dtype)
-            d = data[offset:offset+length]
-            # deal with some special cases
-            if k == 'uid' or k == 'fwtime':
-                r = struct.unpack(dtype, d)[0]
-                self.logger.debug('%s: %s'%(k, hex(r)))
-                hk_data[k] = r
+            hk_data = {}
+            hk_data['timestamp'] = self.timestamp[i]
+            if self.data[i] is None:
+                self.logger.warning('Error: HK data is None')
                 continue
-            if k == 'fwver':
-                r = struct.unpack(dtype, d)[0].decode('utf-8')[::-1]
-                self.logger.debug('%s: %s'%(k, r))
-                hk_data[k] = r
-                continue
-            if k == 'boardloc':
-                r = struct.unpack(dtype, d)[0]
-                hk_data[k] = '192.168.%d.%d'%(r>>8, r&0xff)
+            for k, v in HKPktDef.items():
+                self.logger.debug('key: %s'%k)
+                offset = v['offset']
+                self.logger.debug('offset: %d'%offset)
+                length = v['length']
+                self.logger.debug('length: %d'%length)
+                flag = DType[v['type']]['flag']
+                self.logger.debug('flag: %s'%flag)
+                size = DType[v['type']]['size']
+                self.logger.debug('size: %d'%size)
+                dtype = '<%d%s'%(length/size, flag)
+                self.logger.debug('dtype: %s'%dtype)
+                d = self.data[i][offset:offset+length]
+                # deal with some special cases
+                if k == 'uid' or k == 'fwtime':
+                    r = struct.unpack(dtype, d)[0]
+                    self.logger.debug('%s: %s'%(k, hex(r)))
+                    hk_data[k] = r
+                    continue
+                if k == 'fwver':
+                    r = struct.unpack(dtype, d)[0].decode('utf-8')[::-1]
+                    self.logger.debug('%s: %s'%(k, r))
+                    hk_data[k] = r
+                    continue
+                if k == 'boardloc':
+                    r = struct.unpack(dtype, d)[0]
+                    hk_data[k] = '192.168.%d.%d'%(r>>8, r&0xff)
+                    self.logger.debug('%s: %s'%(k, hk_data[k]))
+                    continue
+                # for other cases
+                # not all of the structs have lsb, constant, bit
+                try:
+                    lsb = v['lsb']
+                except:
+                    lsb = 1
+                try:
+                    constant = v['constant']
+                except:
+                    constant = 0
+                try:
+                    bit = v['bit']
+                except:
+                    bit = None
+                # start to parse hk data
+                if length == 1 and bit is None:
+                    hk_data[k] = self.data[i][offset]
+                elif length == 1 and bit is not None:
+                    hk_data[k] = (self.data[i][offset] >> bit) & 0x01
+                else:
+                    r = struct.unpack(dtype, d)[0]
+                    self.logger.debug('k: %s, r: %d, constant: %d'%(k, r, constant))
+                    hk_data[k] = r * lsb + constant
                 self.logger.debug('%s: %s'%(k, hk_data[k]))
-                continue
-            # for other cases
-            # not all of the structs have lsb, constant, bit
-            try:
-                lsb = v['lsb']
-            except:
-                lsb = 1
-            try:
-                constant = v['constant']
-            except:
-                constant = 0
-            try:
-                bit = v['bit']
-            except:
-                bit = None
-            # start to parse hk data
-            if length == 1 and bit is None:
-                hk_data[k] = data[offset]
-            elif length == 1 and bit is not None:
-                hk_data[k] = (data[offset] >> bit) & 0x01
-            else:
-                r = struct.unpack(dtype, d)[0]
-                self.logger.debug('k: %s, r: %d, constant: %d'%(k, r, constant))
-                hk_data[k] = r * lsb + constant
-            self.logger.debug('%s: %s'%(k, hk_data[k]))
-        return hk_data
+            parsed_data[i] = hk_data
+        return parsed_data
+    
+    def DumpData(self, filename = 'hk_data.npz'):
+        """
+        Description:
+            dump the data to a file.
+        Inputs:
+            - filename(str): the file name.
+        """
+        self.logger.info('dump HK data to %s'%filename)
+        np.savez(filename, data=self.data, timestamp=self.timestamp)
 
 class DataRecv(QuaboSock):
     """
@@ -1857,7 +2095,7 @@ class DataRecv(QuaboSock):
          '8bit': 272,
          '16bit': 528    
     }
-    def __init__(self, ip_addr, timeout=0.5, logger='QuaboAutoTest'):
+    def __init__(self, ip_addr, timeout=0.5, logger='Quabo'):
         """
         Description:
             The constructor of DataRecv class.
@@ -1873,97 +2111,89 @@ class DataRecv(QuaboSock):
         self.data = None
         self.timestamp = None
 
-    def RecvData(self, mode='16bit'):
+    def RecvData(self, n=1, mode='16bit'):
         """
         Description:
             receive the data from the quabo.
         Inputs:
+            - n(int): the number of packets to receive.
             - mode(str): the mode of the data, '8bit' or '16bit'.
         """
         self.logger.info('receive science data')
-        try:
-            reply, addr = self.sock.recvfrom(DataRecv.PKTLEN[mode])
-        except Exception as e:
-            self.logger.error('Error receiving Science data: %s'%e)
-        if addr[0] != self.ip_addr:
-            self.data = None
-            return None, None
-        timestamp = datetime.now()
-        self.logger.debug('Science data received at %s'%timestamp.strftime('%Y-%m-%d %H:%M:%S'))
-        bytesback = reply
-        self.data = bytesback
-        self.timestamp = timestamp.timestamp()
-        return self.data, self.timestamp
+        self.data = np.zeros(n, dtype=object)
+        self.timestamp = np.zeros(n, dtype=float)
+        for i in range(n):
+            try:
+                recv, addr = self.sock.recvfrom(DataRecv.PKTLEN[mode])
+            except Exception as e:
+                self.logger.error('Error receiving Science data: %s'%e)
+            if addr[0] != self.ip_addr:
+                self.data = None
+                return None, None
+            timestamp = datetime.now()
+            self.logger.debug('Science data received at %s'%timestamp.strftime('%Y-%m-%d %H:%M:%S'))
+            self.data[i] = recv
+            self.timestamp[i] = timestamp.timestamp()
 
-    def ParseData(self, data, timestamp, mode='ph'):
+    def ParseData(self, mode='ph'):
         """
         Description:
             parse the data received from the quabo.
         Inputs:
             - data(bytearray): the data received from the quabo.
-            - timestamp(float): the timestamp of the data received.
-            - mode(str): the mode of the data, 'ph' or 'movie-16bit' or 'movie-8bit'.
         """
         self.logger.info('parse science data')
-        if data is None:
-            return None
-        # parse the data here
-        sci_data = {}
-        sci_data['timestamp'] = timestamp
-        self.logger.debug('%s: %s'%('timestamp', timestamp))
-        for k,v in DaqPktDef.items():
-            # deal with some special cases
-            if k == 'boardloc':
-                r = struct.unpack('<H', data[0:2])[0]
-                sci_data[k] = '192.168.%d.%d'%(r>>8, r&0xff)
-                self.logger.debug('%s: %s'%(k, sci_data[k]))
+        parsed_data = []
+        for i in range(len(self.data)):
+            if self.data[i] is None:
+                self.logger.warning('Error: Science data is None')
                 continue
-            if k == 'data':
-                offset = v[mode]['offset']
-                length = v[mode]['length']
-                flag = DType[v[mode]['type']]['flag']
-                size = DType[v[mode]['type']]['size']
+            data = self.data[i]
+            timestamp = self.timestamp[i]
+            # parse the data here
+            sci_data = {}
+            sci_data['timestamp'] = timestamp
+            self.logger.debug('%s: %s'%('timestamp', timestamp))
+            for k,v in DaqPktDef.items():
+                # deal with some special cases
+                if k == 'boardloc':
+                    r = struct.unpack('<H', data[0:2])[0]
+                    sci_data[k] = '192.168.%d.%d'%(r>>8, r&0xff)
+                    self.logger.debug('%s: %s'%(k, sci_data[k]))
+                    continue
+                if k == 'data':
+                    offset = v[mode]['offset']
+                    length = v[mode]['length']
+                    flag = DType[v[mode]['type']]['flag']
+                    size = DType[v[mode]['type']]['size']
+                    d = data[offset:offset+length]
+                    dtype = '<%d%s'%(length/size, flag)
+                    r = struct.unpack(dtype, d)
+                    if mode == 'ph':
+                        sci_data[k] = np.array(r, dtype=np.short)
+                    elif mode == 'movie-16bit':
+                        sci_data[k] = np.array(r, dtype=np.ushort)
+                    elif mode == 'movie-8bit':
+                        sci_data[k] = np.array(r, dtype=np.ubyte) 
+                    self.logger.debug('len(%s): %s'%(k, len(sci_data[k])))
+                    continue
+                offset = v['offset']
+                length = v['length']
+                flag = DType[v['type']]['flag']
+                size = DType[v['type']]['size']
                 d = data[offset:offset+length]
                 dtype = '<%d%s'%(length/size, flag)
-                r = struct.unpack(dtype, d)
-                if mode == 'ph':
-                    sci_data[k] = np.array(r, dtype=np.short)
-                elif mode == 'movie-16bit':
-                    sci_data[k] = np.array(r, dtype=np.ushort)
-                elif mode == 'movie-8bit':
-                    sci_data[k] = np.array(r, dtype=np.ubyte) 
-                self.logger.debug('len(%s): %s'%(k, len(sci_data[k])))
-                continue
-            offset = v['offset']
-            length = v['length']
-            flag = DType[v['type']]['flag']
-            size = DType[v['type']]['size']
-            d = data[offset:offset+length]
-            dtype = '<%d%s'%(length/size, flag)
-            sci_data[k] = struct.unpack(dtype, d)[0]
-            self.logger.debug('%s: %s'%(k, sci_data[k]))
-        return sci_data
+                sci_data[k] = struct.unpack(dtype, d)[0]
+                self.logger.debug('%s: %s'%(k, sci_data[k]))
+            parsed_data.append(sci_data)
+        return np.array(parsed_data)
 
-if __name__ == '__main__':
-    # get the quabo ip
-    with open('configs/quabo_ip.json') as f:
-        quabo_ip = json.load(f)
-    # ping the quabo first
-    print('ping quabo: %s'%quabo_ip['ip'])
-    status = Util.ping(quabo_ip['ip'])
-    if status == False:
-        print('Quabo is not reachable.')
-        exit(1)
-    # get the flash uid
-    quabo = tftpw(quabo_ip['ip'])
-    uid = quabo.get_flashuid()
-    # create a logger, and the file handler name is based on the uid
-    logger = Util.create_logger('logs/Quabo-%s.log'%uid)
-    logger.info('Start quabo autotest - UID: %s'%uid)
-    # reboot the quabo
-    logger.info('Rebooting Quabo...')
-    quabo.reboot()
-    if status == False:
-        print('Quabo is not reachable.')
-        exit(1)
-    logger.info('Quabo Rebooted successfully')
+    def DumpData(self, filename = 'sci_data.npz'):
+        """
+        Description:
+            dump the data to a file.
+        Inputs:
+            - filename(str): the file name.
+        """
+        self.logger.info('dump science data to %s'%filename)
+        np.savez(filename, data=self.data, timestamp=self.timestamp)

@@ -1,28 +1,44 @@
 from QuaboAutoTest import *
 import json
 
-quabo_ip = Util.read_json('configs/quabo_ip.json')
-quabo = tftpw(quabo_ip['ip'])
-uid = quabo.get_flashuid()
-autotest = QuaboTest(uid)
+autotest = QuaboTest('configs/quabo_ip.json')
 
-def test_hk():
-    # get quabo ip
-    quabo_ip = Util.read_json('configs/quabo_ip.json')
-    # configure quabo, setting HV
-    qc = QuaboConfig(quabo_ip['ip'])
-    qc.SetHkPacketDest()
-    mac = qc.SetDataPktDest()
-    qc.SetHv('on')
-    qc.close()
-    # get hk packets
-    hk = HKRecv(quabo_ip['ip'])
-    expected_results = Util.read_json('configs/expected_results.json')
-    e_hk = expected_results['hk']
-    # get the hk packets
-    d, t = hk.RecvData()
-    hkpkt = hk.ParseData(d, t)
-    hk.close()
-    # check the hk packets
-    result = autotest.CheckResults(e_hk, hkpkt)
+def test_hk_vals():
+    """
+    Description: 
+        Check the HK values
+    """
+    result = autotest.CheckHKPktVals()  
+    assert result == True
+
+def test_hk_timestamp():
+    """"
+    Description: 
+        Check the HK timestamp"
+    """
+    result = autotest.CheckHKTimestamp()  
+    assert result == True
+
+def test_maroc_config():
+    """"
+    Description: 
+        Check the MAROC config
+    """
+    result = autotest.CheckMarocConfig()  
+    assert result == True
+
+def test_ph_data():
+    """"
+    Description: 
+        Check the PH data"
+    """
+    result = autotest.CheckPHdata()  
+    assert result == True
+
+def test_ph_data_timestamp():
+    """"
+    Description: 
+        Check the PH data timestamp
+    """
+    result = autotest.CheckPHTimestamp()  
     assert result == True

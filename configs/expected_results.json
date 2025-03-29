@@ -1,151 +1,179 @@
 {
-    "hk": {
-        "timediff": {
-            "val": 2.5,
-            "offset": 0.5,
-            "valid": false
-        },
+    "hk_vals": {
         "tag": {
             "val": 32,
-            "offset": 0,
+            "deviation": 0,
             "valid": true
         },
         "boardloc": {
             "val": "192.168.3.248",
-            "offset": 0,
+            "deviation": 0,
             "valid": true
         },
         "hvmon0": {
-            "val": -55,
-            "offset": 1,
+            "val": -55.0,
+            "deviation": 1,
             "valid": true
         },
         "hvmon1": {
-            "val": -55,
-            "offset": 1,
+            "val": -55.0,
+            "deviation": 1,
             "valid": true
         },
         "hvmon2": {
-            "val": -55,
-            "offset": 1,
+            "val": -55.0,
+            "deviation": 1,
             "valid": true
         },
         "hvmon3": {
-            "val": -55,
-            "offset": 1,
+            "val": -55.0,
+            "deviation": 1,
             "valid": true
         },
         "hvimon0": {
             "val": 0.00011,
-            "offset": 0.00001,
+            "deviation": 0.00001,
             "valid": false
         },
         "hvimon1": {
             "val": 0.00011,
-            "offset": 0.00001,
+            "deviation": 0.00001,
             "valid": false
         },
         "hvimon2": {
             "val": 0.00011,
-            "offset": 0.00001,
+            "deviation": 0.00001,
             "valid": false
         },
         "hvimon3": {
             "val": 0.00011,
-            "offset": 0.00001,
+            "deviation": 0.00001,
             "valid": false
         },
         "rawhvmon": {
-            "val": -70,
-            "offset": 1,
+            "val": -70.0,
+            "deviation": 1.0,
             "valid": true
         },
         "v12mon": {
             "val": 1.2,
-            "offset": 0.02,
+            "deviation": 0.03,
             "valid": true
         },
         "v18mon": {
             "val": 1.8,
-            "offset": 0.02,
+            "deviation": 0.02,
             "valid": true
         },
         "v33mon": {
             "val": 3.3,
-            "offset": 0.05,
+            "deviation": 0.1,
             "valid": true
         },
         "v37mon": {
             "val": 3.7,
-            "offset": 0.05,
+            "deviation": 0.05,
             "valid": true
         },
         "i10mon": {
             "val": 0.76,
-            "offset": 0.05,
+            "deviation": 0.1,
             "valid": true
         },
         "i18mon": {
             "val": 0.35,
-            "offset": 0.05,
+            "deviation": 0.05,
             "valid": true
         },
         "i33mon": {
             "val": 0.12,
-            "offset": 0.05,
+            "deviation": 0.05,
             "valid": true
         },
         "det_temp": {
             "val": 25,
-            "offset": 10,
+            "deviation": 10,
             "valid": false
         },
         "fpga_temp": {
             "val": 40,
-            "offset": 10,
+            "deviation": 10,
             "valid": false
         },
         "vccint": {
             "val": 1.0,
-            "offset": 0.05,
+            "deviation": 0.05,
             "valid": true
         },
         "vccaux": {
             "val": 1.8,
-            "offset": 0.02,
+            "deviation": 0.02,
             "valid": true
         },
         "uid": {
             "val": 0,
-            "offset": 0,
+            "deviation": 0,
             "valid": false
         },
         "shutter_status": {
             "val": 0,
-            "offset": 0,
+            "deviation": 0,
             "valid": false
         },
         "sensor_status": {
             "val": 0,
-            "offset": 0,
+            "deviation": 0,
             "valid": false
         },
         "pcbrev": {
             "val": 1,
-            "offset": 0,
+            "deviation": 0,
             "valid": true
         },
         "fwtime": {
             "val": 676413525,
-            "offset": 0,
+            "deviation": 0,
             "valid": true
         },
         "fwver": {
             "val": "0207",
-            "offset": 0,
+            "deviation": 0,
             "valid": true
         }
     },
-    "ph": {},
+    "hk_tdiff": {
+        "val": 2.5,
+        "deviation": 0.5
+    },
+    "ph_data": {
+        "max": {
+            "val": 2900,
+            "deviation": 200,
+            "valid": true
+        },
+        "min": {
+            "val": 2900,
+            "deviation": 200,
+            "valid": true
+        },
+        "mean": {
+            "val": 2900,
+            "deviation": 200,
+            "valid": true
+        },
+        "std": {
+            "val": 60,
+            "deviation": 20,
+            "valid": true
+        }
+    },
+    "ph_npeak": {
+        "val": 2,
+        "deviation": 0
+    },
+    "ph_pulse_rate": {
+        "val": 64.0,
+        "deviation": 1.0
+    },
     "moive": {}
 }
