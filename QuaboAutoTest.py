@@ -15,6 +15,7 @@ import logging
 import numpy as np
 from datetime import datetime
 import time
+import netifaces
 
 # The LSBParams describes the map of the code ids to the real settings.
 # All of the info is from the PANOSETI wiki:
@@ -423,6 +424,27 @@ class Util(object):
         with open(filename) as f:
             data = json.load(f)
         return data  
+    
+    @staticmethod
+    def get_mac_by_ip(ip_address):
+        """
+        Description:
+            Get the MAC address by IP address.
+        """
+        interfaces = netifaces.interfaces()
+
+        for interface in interfaces:
+            # get the interface info
+            addresses = netifaces.ifaddresses(interface)
+            # get ip address
+            if netifaces.AF_INET in addresses:
+                for addr in addresses[netifaces.AF_INET]:
+                    if addr['addr'] == ip_address:
+                        # get mac
+                        if netifaces.AF_LINK in addresses:
+                            mac_address = addresses[netifaces.AF_LINK][0]['addr']
+                            return mac_address
+        return None
 
 class QuaboTest(object):
     """
@@ -536,6 +558,9 @@ class QuaboTest(object):
         self.logger.info('------------------------------------')
         self.logger.info('Checking HK Timestamp Difference')
         self.logger.info('------------------------------------')
+        if self.expected_results['hk_tdiff']['valid'] == False:
+            self.logger.info('HK timestamp difference will be skipped')
+            return True
         e_val = self.expected_results['hk_tdiff']['val']
         e_offset = self.expected_results['hk_tdiff']['deviation']
         hk = HKRecv(self.ip)
@@ -581,8 +606,35 @@ class QuaboTest(object):
         self.logger.info('------------------------------------')
         self.logger.info('Checking Destination MAC Address')
         self.logger.info('------------------------------------')
-        # TODO: implement the check
-        pass
+        if self.expected_results['dest_mac']['valid'] == False:
+            self.logger.info('Destination MAC address will be skipped')
+            return True
+        qc = QuaboConfig(self.ip)
+        # get the destination MAC address
+        macs = qc.SetDataPktDest()
+        qc.close()
+        quabo_config = Util.read_json('configs/quabo_config.json')
+        # get the destination MAC address for PH packets
+        ph_dest_ip = quabo_config['dest_ips']['PH']
+        self.logger.info('PH destination IP address: %s'%ph_dest_ip)
+        ph_mac_local = Util.get_mac_by_ip(ph_dest_ip)
+        self.logger.info('PH MAC address got on local machine: %s'%ph_mac_local)
+        ph_mac_quabo = ":".join("{:02x}".format(b) for b in macs['PH'])
+        self.logger.info('PH MAC address got on Quabo: %s'%ph_mac_quabo)
+        # get the destination MAC address for Movie packets
+        movie_dest_ip = quabo_config['dest_ips']['MOVIE']
+        self.logger.info('Movie destination IP address: %s'%movie_dest_ip)
+        movive_mac_local = Util.get_mac_by_ip(movie_dest_ip)
+        self.logger.info('Movie MAC address got on local machine: %s'%movive_mac_local)
+        movie_mac = ":".join("{:02x}".format(b) for b in macs['MOVIE'])
+        self.logger.info('Movie MAC address got on Quabo: %s'%movie_mac)
+        if ph_mac_local == ph_mac_quabo and movive_mac_local == movie_mac:
+            self.logger.info('Destination MAC address is correct')
+            return True
+        else:
+            self.logger.error('Destination MAC address is not correct')
+            return False
+
 
     def CheckPHdata(self):
         """
@@ -646,6 +698,9 @@ class QuaboTest(object):
         self.logger.info('------------------------------------')
         self.logger.info('Checking PH Timestamp Difference')
         self.logger.info('------------------------------------')
+        if self.expected_results['ph_pulse_rate']['valid'] == False:
+            self.logger.info('PH timestamp difference will be skipped')
+            return True
         e_val = self.expected_results['ph_pulse_rate']['val']
         e_offset = self.expected_results['ph_pulse_rate']['deviation']
         # config the quabo

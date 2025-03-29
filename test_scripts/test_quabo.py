@@ -27,6 +27,14 @@ def test_maroc_config():
     result = autotest.CheckMarocConfig()  
     assert result == True
 
+def test_destination_mac():
+    """"
+    Description: 
+        Check the destination MAC address
+    """
+    result = autotest.CheckDestMac()  
+    assert result == True
+
 def test_ph_data():
     """"
     Description: 

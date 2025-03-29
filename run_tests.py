@@ -53,4 +53,5 @@ if __name__ == "__main__":
         print('Quabo is not reachable.')
         exit(1)
     # Step 7: run the tests
-    pytest.main(["./test_scripts", "--html=reports/%s/reports.html"%uid, "-p no:logging", "-v"])
+    #pytest.main(["./test_scripts", "--html=reports/%s/reports.html"%uid, "-p no:logging", "-v"])
+    pytest.main(["./test_scripts", "--html=reports/%s/reports.html"%uid, "-v"])

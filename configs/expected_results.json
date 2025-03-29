@@ -143,7 +143,11 @@
     },
     "hk_tdiff": {
         "val": 2.5,
-        "deviation": 0.5
+        "deviation": 0.5,
+        "valid": true
+    },
+    "dest_mac": {
+        "valid": true
     },
     "ph_data": {
         "max": {
@@ -169,11 +173,13 @@
     },
     "ph_npeak": {
         "val": 2,
-        "deviation": 0
+        "deviation": 0,
+        "valid": true
     },
     "ph_pulse_rate": {
         "val": 64.0,
-        "deviation": 1.0
+        "deviation": 1.0,
+        "valid": true
     },
     "moive": {}
 }
