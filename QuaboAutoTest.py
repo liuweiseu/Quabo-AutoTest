@@ -408,7 +408,20 @@ class Util(object):
             logger.handlers.clear()
         logger.addHandler(handler)
         return logger
-            
+    
+    @staticmethod    
+    def read_json(filename):
+        """
+        Description:
+            read the json file.
+        Inputs:
+            - filename(str): the file name of json file.
+        Outputs:
+            - data(dict): the data in the json file.
+        """
+        with open(filename) as f:
+            data = json.load(f)
+        return data  
 
 class tftpw(object):
     """
@@ -655,6 +668,18 @@ class QuaboSock(object):
         """
         self.sock.sendto(bytes(data), (self.ip_addr, self.port))
 
+    def flush_rx_buf(self):
+        """
+        Description:
+            flush the rx buffer.
+        """
+        # read until the buffer is empty
+        while True:
+            try:
+                x = self.sock.recvfrom(2048)
+            except:
+                break
+
     def close(self):
         """
         Description:
@@ -727,7 +752,7 @@ class QuaboConfig(QuaboSock):
     SERIAL_COMMAND_LENGTH = 829
     ACQ_MODE = {
         'PULSE_HEIGHT'          : 0x1,
-        'IMAGE'                 : 0x2,
+        'IMAGE_16BIT'           : 0x2,
         'IMAGE_8BIT'            : 0x4,
         'NO_BASELINE_SUBTRACT'  : 0x10
     }
@@ -800,7 +825,6 @@ class QuaboConfig(QuaboSock):
                 count += 1
             except:
                 break
-        #print('flush_rx_buffer: got %d bytes'%nbytes)
 
     def close(self):
         """
@@ -820,7 +844,7 @@ class QuaboConfig(QuaboSock):
         cmd = self.make_cmd(0x03)
         mode = 0
         if params.do_image:
-            mode |= QuaboConfig.ACQ_MODE['IMAGE']
+            mode |= QuaboConfig.ACQ_MODE['IMAGE_16BIT']
             self.logger.debug('16Bit movie Mode')
         if params.image_8bit:
             mode |= QuaboConfig.ACQ_MODE['IMAGE_8BIT']
@@ -831,7 +855,9 @@ class QuaboConfig(QuaboSock):
         if not params.bl_subtract:
             mode |= QuaboConfig.ACQ_MODE['NO_BASELINE_SUBTRACT']
             self.logger.debug('no baseline subtract')
+        self.logger.debug('mode: %02x'%mode)
         cmd[2] = mode
+        params.image_us = params.image_us - 1
         cmd[4] = params.image_us % 256
         cmd[5] = params.image_us // 256
         self.logger.debug('Integration time is %d us'% params.image_us)
@@ -889,7 +915,7 @@ class QuaboConfig(QuaboSock):
         Description:
             set destination IP addr for both PH and movie packets.
         Inputs:
-            - dest_str(str): the dest ip address or hostname for PH and movie packets.
+            - dest_str(str)`: the dest ip address or hostname for PH and movie packets.
         """
         ips = self.quabo_config['dest_ips']
         ph_ip = ips['PH']

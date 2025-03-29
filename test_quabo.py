@@ -1,2 +1,53 @@
-from QuaboAutoTest import QuaboConfig, HKRecv, DataRecv
+from QuaboAutoTest import *
 
+# Step 1: get the quabo ip
+quabo_ip = Util.read_json('configs/quabo_ip.json')
+if quabo_ip == None:
+    print('quabo_ip.json is not found.')
+    exit(1)
+
+# Step 2: ping the quabo first
+print('ping quabo: %s'%quabo_ip['ip'])
+status = Util.ping(quabo_ip['ip'])
+if status == False:
+    print('Quabo is not reachable.')
+    exit(1)
+
+# Step 3: get the flash uid
+quabo = tftpw(quabo_ip['ip'])
+uid = quabo.get_flashuid()
+if uid == None:
+    print('Failed to get the flash uid.')
+    exit(1)
+# Step 4: create a logger based on the uid
+logger = Util.create_logger('logs/Quabo-%s.log'%uid)
+logger.info('Start Quabo Auto Test')
+logger.info('UID: %s'%uid)
+logger.info('MAC: 00:%s:%s:%s:%s:%s', uid[10:12], uid[8:10], uid[6:8], uid[4:6], uid[2:4])
+    
+# Step 5: Reboot the quabo
+# reboot the quabo
+logger.info('Rebooting Quabo...')
+quabo.reboot()
+if status == False:
+    print('Quabo is not reachable.')
+    exit(1)
+logger.info('Quabo Rebooted successfully')
+
+# Step 6: ping the quabo to make sure the quabo is rebooted
+print('ping quabo: %s'%quabo_ip['ip'])
+status = Util.ping(quabo_ip['ip'])
+if status == False:
+    print('Quabo is not reachable.')
+    exit(1)
+
+# Step 7: create HKRecv, QuaboConfing and DataRecv objects
+hk = HKRecv(quabo_ip['ip'])
+qc = QuaboConfig(quabo_ip['ip'])
+qcd = DataRecv(quabo_ip['ip'])
+
+# Step 8: test on hk packets
+def test_hk():
+    d, t = hk.RecvData()
+    hkpkt = hk.ParseData(d, t)
+    assert hkpkt['fwver'] == '0207'
