@@ -3,7 +3,7 @@
         "timediff": {
             "val": 2.5,
             "offset": 0.5,
-            "valid": true
+            "valid": false
         },
         "tag": {
             "val": 32,
@@ -115,6 +115,36 @@
             "offset": 0.02,
             "valid": true
         },
+        "uid": {
+            "val": 0,
+            "offset": 0,
+            "valid": false
+        },
+        "shutter_status": {
+            "val": 0,
+            "offset": 0,
+            "valid": false
+        },
+        "sensor_status": {
+            "val": 0,
+            "offset": 0,
+            "valid": false
+        },
+        "pcbrev": {
+            "val": 1,
+            "offset": 0,
+            "valid": true
+        },
+        "fwtime": {
+            "val": 676413525,
+            "offset": 0,
+            "valid": true
+        },
+        "fwver": {
+            "val": "0207",
+            "offset": 0,
+            "valid": true
+        }
     },
     "ph": {},
     "moive": {}

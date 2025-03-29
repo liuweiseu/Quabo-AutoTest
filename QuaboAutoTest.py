@@ -389,7 +389,7 @@ class Util(object):
         return False
     
     @staticmethod
-    def create_logger(filename, mode='w', tag='QuaboAutoTest'):
+    def create_logger(filename, mode='w', tag='Quabo'):
         """ 
         Description:
             create a logger for the quabo autotest.
@@ -422,6 +422,49 @@ class Util(object):
         with open(filename) as f:
             data = json.load(f)
         return data  
+
+class QuaboTest(object):
+    """
+    Description:
+        The QuaboTest class is used to test the quabo.
+    """    
+    def __init__(self, uid):
+        """
+        Description:
+            The constructor of QuaboTest class.
+        Inputs:
+            - uid(str): the uid of the quabo.
+        """
+        self.uid = uid
+        self.logger = Util.create_logger('reports/%d/reports.log'%uid, mode='a', tag='QuaboAutoTest')
+        self.logger.info('Quabo UID - %s'%uid)
+
+    def CheckResults(self, expected_results, actual_results):
+        """
+        Description:
+            Check the results of the test.
+        Input:
+            expected_results(dict): expected results
+            actual_results(dict): actual results
+        Output:
+            result(bool): True if the test passed, False otherwise
+        """
+        passed = True
+        for k,v in expected_results.items():
+            if v['valid'] == False:
+                continue
+            e_val = v['val']
+            e_offset = v['offset']
+            a_val = actual_results[k]
+            if type(e_val) == str:
+                if e_val != a_val:
+                    passed = False
+                    self.logger.error('Error: expected val(%s) is not equal to acutal val(%s)'%(e_val, a_val))
+            else:
+                if abs(e_val) - e_offset > abs(a_val) or abs(e_val) + e_offset < abs(a_val):
+                    passed = False
+                    self.logger.error('Error: expected val(%s)/offset(%.02f) is not equal to %s'%(k, a_val))
+        return passed
 
 class tftpw(object):
     """
