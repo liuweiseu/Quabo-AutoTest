@@ -451,9 +451,7 @@ class QuaboTest(object):
     Description:
         The QuaboTest class is used to test the quabo.
     """    
-    N_PH_PKT = 1000
-    N_MOVIE_PKT = 1000
-    def __init__(self, ip_file='configs/quabo_ip.json', expected_results_file='configs/expected_results.json'):
+    def __init__(self, ip_file='configs/quabo_ip.json', autotest_config_file= 'configs/autotest_config.json', expected_results_file='configs/expected_results.json'):
         """
         Description:
             The constructor of QuaboTest class.
@@ -465,6 +463,8 @@ class QuaboTest(object):
         self.ip = quabo_ip['ip']
         # create tftpw client
         self.client = tftpw(self.ip)
+        # get the auto test config
+        self.autotest_config = Util.read_json(autotest_config_file)
         # read the expected results
         self.expected_results = Util.read_json(expected_results_file)
         # get uid
@@ -635,7 +635,62 @@ class QuaboTest(object):
             self.logger.error('Destination MAC address is not correct')
             return False
 
-
+    def CheckPHPeaks(self):
+        """
+        Description:
+            Check how many peaks are in the PH data.
+        """
+        self.logger.info('------------------------------------')
+        self.logger.info('Checking PH Peaks')
+        self.logger.info('------------------------------------')
+        if self.expected_results['ph_npeak']['valid'] == False:
+            self.logger.info('PH peaks will be skipped')
+            return True
+        e_val = self.expected_results['ph_npeak']['val']
+        e_offset = self.expected_results['ph_npeak']['deviation']
+        # config the quabo
+        qc = QuaboConfig(self.ip)
+        # set the PH packet destination
+        qc.SetDataPktDest()
+        # turn on the high voltage
+        qc.SetHv('on')
+        # configure the MAROC parameters
+        qc.SetMarocParams()
+        # set the PH packet mode
+        params = DAQ_PARAMS(do_image=False, image_us=1000, image_8bit=False, do_ph=True,bl_subtract=True)
+        qc.DaqParamsConfig(params)
+        # wait for a few seconds to let the quabo warm up
+        time.sleep(2)
+        ph = DataRecv(self.ip)
+        ph.RecvData(self.autotest_config['NPhPeaks'])
+        # turn off the high voltage
+        qc.SetHv('off')
+        # turn off the PH packet mode
+        params = DAQ_PARAMS(do_image=False, image_us=1000, image_8bit=False, do_ph=False,bl_subtract=True)
+        qc.DaqParamsConfig(params)
+        qc.close()
+        ph.close()
+        ph.DumpData('reports/%s/ph_peaks.npz'%self.uid)
+        # parse the PH data
+        phpkt = ph.ParseData()
+        # check the PH data
+        npeaks = []
+        for d in phpkt:
+            n = 0
+            mean = np.mean(d['data'])
+            for i in range(len(d['data'])):
+                if d['data'][i] > self.autotest_config['PHThreshold'] + mean:
+                    n += 1
+            npeaks.append(n)
+        npeaks = np.array(npeaks)
+        a_val = np.mean(npeaks)
+        if a_val != e_val:
+            self.logger.error('Error: PH peaks - Expected val(%d) is not equal to %.02f'%(e_val, a_val))
+            return False
+        else:
+            self.logger.info('Info: PH peaks - Expected val(%d) is equal to %.02f'%(e_val, a_val))
+            return True
+        
     def CheckPHdata(self):
         """
         Description:
@@ -661,7 +716,7 @@ class QuaboTest(object):
         # wait for a few seconds to let the quabo warm up
         time.sleep(2)
         ph = DataRecv(self.ip)
-        ph.RecvData(QuaboTest.N_PH_PKT)
+        ph.RecvData(self.autotest_config['NPhPkt'])
         # turn off the high voltage
         qc.SetHv('off')
         # turn off the PH packet mode
@@ -717,7 +772,7 @@ class QuaboTest(object):
         # wait for a few seconds to let the quabo warm up
         time.sleep(2)
         ph = DataRecv(self.ip)
-        ph.RecvData(QuaboTest.N_PH_PKT)
+        ph.RecvData(self.autotest_config['NPhPkt'])
         # turn off the high voltage
         qc.SetHv('off')
         # turn off the PH packet mode
@@ -741,7 +796,18 @@ class QuaboTest(object):
             self.logger.info('Info: PH timestamp difference - Expected val(%.02f)/deviation(%.02f) is equal to %.02f'%(e_val, e_offset, a_val))
             return True
 
-
+    def CheckPHPattern(self):
+        """
+        Description:
+            Check the PH data pattern.
+        """
+        self.logger.info('------------------------------------')
+        self.logger.info('Checking PH Data Pattern')
+        self.logger.info('------------------------------------')
+        if self.expected_results['ph_pattern']['valid'] == False:
+            self.logger.info('PH data pattern will be skipped')
+            return True
+        pass
     
 class tftpw(object):
     """
