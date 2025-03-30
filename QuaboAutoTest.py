@@ -560,7 +560,7 @@ class QuaboTest(object):
         qc.SetHv('off')
         qc.close()
         hk.close()
-        hk.DumpData('reports/%s/quabo_hk_vals.npz'%self.uid)
+        hk.DumpData('reports/%s/quabo/hk_vals.npz'%self.uid)
         hkpkt = hk.ParseData()
         return self.CheckResults(expected_results, hkpkt[0])
 
@@ -579,7 +579,7 @@ class QuaboTest(object):
         e_offset = self.expected_results['hk_tdiff']['deviation']
         hk = HKRecv(self.ip)
         hk.RecvData(2)
-        hk.DumpData('reports/%s/quabo_hk_timestamp.npz'%self.uid)
+        hk.DumpData('reports/%s/quabo/hk_timestamp.npz'%self.uid)
         hkpkt = hk.ParseData()
         hk.close()
         # get the time difference
@@ -661,6 +661,7 @@ class SiPMSimTest(QuaboTest):
     Description:
         The SiPMSimTest class is used to test the pixel.
     """
+    PIXEL_PER_CONNECTOR = 32
     def __init__(self, connector='J1A', ip_file='configs/quabo_ip.json', expected_results_file='configs/expected_results.json'):
         """
         Description:
@@ -674,6 +675,27 @@ class SiPMSimTest(QuaboTest):
         self.logger = Util.create_logger('reports/%s/reports_sipm_%s.log'%(self.uid, self.connector), mode='w', tag='SiPMSimTest')
         self.logger.info('Quabo UID - %s'%self.uid)
     
+    def _CheckPatternMatch(d, p):
+        """
+        Description:
+            Check if the data and pattern match to each other.
+        Inputs:
+            - d(np.darray): the data to check.
+            - p(np.darray): the pattern to check.
+        Outputs:
+            - bool: True if the data and pattern match, False otherwise.
+        """
+        match = False
+        for i in range(len(p)):
+            if p[i] == d[0]:
+                for j in range(len(d)):
+                    k = (i + j)%len(p)
+                    if p[k] != d[j]:
+                        break
+                    elif j == len(d) - 1:
+                        match = True
+        return match
+
     def CheckPHPattern(self):
         """
         Description:
@@ -720,7 +742,7 @@ class SiPMSimTest(QuaboTest):
         qc.DaqParamsConfig(params)
         qc.close()
         ph.close()
-        ph.DumpData('reports/%s/sipmsim_ph_peaks.npz'%self.uid)
+        ph.DumpData('reports/%s/sipmsim/ph_peaks.npz'%self.uid)
         # parse the PH data
         phpkt = ph.ParseData()
         # check the PH data
@@ -774,7 +796,7 @@ class SiPMSimTest(QuaboTest):
         qc.DaqParamsConfig(params)
         qc.close()
         ph.close()
-        ph.DumpData('reports/%s/sipmsim_ph_data.npz'%self.uid)
+        ph.DumpData('reports/%s/sipmsim/ph_data.npz'%self.uid)
         phpkt = ph.ParseData()
         # check the PH data
         peaks = []
@@ -830,7 +852,7 @@ class SiPMSimTest(QuaboTest):
         qc.DaqParamsConfig(params)
         qc.close()
         ph.close()
-        ph.DumpData('reports/%s/sipmsim_ph_timestamp.npz'%self.uid)
+        ph.DumpData('reports/%s/sipmsim/ph_timestamp.npz'%self.uid)
         phpkt = ph.ParseData()
         # get the timestamp
         timestamps = []
@@ -2239,6 +2261,9 @@ class HKRecv(QuaboSock):
             - filename(str): the file name.
         """
         self.logger.info('dump HK data to %s'%filename)
+        datadir = os.path.dirname(filename)
+        if not os.path.exists(datadir):
+            os.makedirs(datadir)
         np.savez(filename, data=self.data, timestamp=self.timestamp)
 
 class DataRecv(QuaboSock):
@@ -2354,4 +2379,7 @@ class DataRecv(QuaboSock):
             - filename(str): the file name.
         """
         self.logger.info('dump science data to %s'%filename)
+        datadir = os.path.dirname(filename)
+        if not os.path.exists(datadir):
+            os.makedirs(datadir)
         np.savez(filename, data=self.data, timestamp=self.timestamp)
