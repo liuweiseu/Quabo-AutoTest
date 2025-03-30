@@ -426,6 +426,20 @@ class Util(object):
         return data  
     
     @staticmethod
+    def write_json(filename, data):
+        """
+        Description:
+            write the json file.
+        Inputs:
+            - filename(str): the file name of json file.
+            - data(dict): the data to write to the json file.
+        Outputs:
+            - None
+        """
+        with open(filename, 'w') as f:
+            json.dump(data, f, indent=4)
+
+    @staticmethod
     def get_mac_by_ip(ip_address):
         """
         Description:
@@ -470,7 +484,7 @@ class QuaboTest(object):
         # get uid
         self.uid = self.client.get_flashuid()
         # create logger
-        self.logger = Util.create_logger('reports/%s/reports.log'%self.uid, mode='w', tag='QuaboAutoTest')
+        self.logger = Util.create_logger('reports/%s/reports_quabo.log'%self.uid, mode='w', tag='QuaboAutoTest')
         self.logger.info('Quabo UID - %s'%self.uid)
 
     def CheckResults(self, expected_results, actual_results):
@@ -546,7 +560,7 @@ class QuaboTest(object):
         qc.SetHv('off')
         qc.close()
         hk.close()
-        hk.DumpData('reports/%s/hk_vals.npz'%self.uid)
+        hk.DumpData('reports/%s/quabo_hk_vals.npz'%self.uid)
         hkpkt = hk.ParseData()
         return self.CheckResults(expected_results, hkpkt[0])
 
@@ -565,7 +579,7 @@ class QuaboTest(object):
         e_offset = self.expected_results['hk_tdiff']['deviation']
         hk = HKRecv(self.ip)
         hk.RecvData(2)
-        hk.DumpData('reports/%s/hk_timestamp.npz'%self.uid)
+        hk.DumpData('reports/%s/quabo_hk_timestamp.npz'%self.uid)
         hkpkt = hk.ParseData()
         hk.close()
         # get the time difference
@@ -635,6 +649,42 @@ class QuaboTest(object):
             self.logger.error('Destination MAC address is not correct')
             return False
 
+    def CheckWR(self):
+        """
+        Description:
+            Check the White Rabbit timing.
+        """
+    
+
+class SiPMSimTest(QuaboTest):
+    """
+    Description:
+        The SiPMSimTest class is used to test the pixel.
+    """
+    def __init__(self, connector='J1A', ip_file='configs/quabo_ip.json', expected_results_file='configs/expected_results.json'):
+        """
+        Description:
+            The constructor of SiPMSimTest class.
+        Inputs:
+            - connector(str): the connector of the pixel.
+        """
+        super().__init__(ip_file = ip_file, expected_results_file = expected_results_file)
+        self.connector = connector
+        # create logger
+        self.logger = Util.create_logger('reports/%s/reports_sipm_%s.log'%(self.uid, self.connector), mode='w', tag='SiPMSimTest')
+        self.logger.info('Quabo UID - %s'%self.uid)
+    
+    def CheckPHPattern(self):
+        """
+        Description:
+            Check the PH data pattern.
+        Outputs:
+            - bool: True if the test passed, False otherwise.
+        """
+        self.logger.info('------------------------------------')
+        self.logger.info('Checking PH Data Pattern')
+        self.logger.info('------------------------------------')
+
     def CheckPHPeaks(self):
         """
         Description:
@@ -670,7 +720,7 @@ class QuaboTest(object):
         qc.DaqParamsConfig(params)
         qc.close()
         ph.close()
-        ph.DumpData('reports/%s/ph_peaks.npz'%self.uid)
+        ph.DumpData('reports/%s/sipmsim_ph_peaks.npz'%self.uid)
         # parse the PH data
         phpkt = ph.ParseData()
         # check the PH data
@@ -724,7 +774,7 @@ class QuaboTest(object):
         qc.DaqParamsConfig(params)
         qc.close()
         ph.close()
-        ph.DumpData('reports/%s/ph_data.npz'%self.uid)
+        ph.DumpData('reports/%s/sipmsim_ph_data.npz'%self.uid)
         phpkt = ph.ParseData()
         # check the PH data
         peaks = []
@@ -780,7 +830,7 @@ class QuaboTest(object):
         qc.DaqParamsConfig(params)
         qc.close()
         ph.close()
-        ph.DumpData('reports/%s/ph_timestamp.npz'%self.uid)
+        ph.DumpData('reports/%s/sipmsim_ph_timestamp.npz'%self.uid)
         phpkt = ph.ParseData()
         # get the timestamp
         timestamps = []
@@ -795,19 +845,6 @@ class QuaboTest(object):
         else:
             self.logger.info('Info: PH timestamp difference - Expected val(%.02f)/deviation(%.02f) is equal to %.02f'%(e_val, e_offset, a_val))
             return True
-
-    def CheckPHPattern(self):
-        """
-        Description:
-            Check the PH data pattern.
-        """
-        self.logger.info('------------------------------------')
-        self.logger.info('Checking PH Data Pattern')
-        self.logger.info('------------------------------------')
-        if self.expected_results['ph_pattern']['valid'] == False:
-            self.logger.info('PH data pattern will be skipped')
-            return True
-        pass
     
 class tftpw(object):
     """

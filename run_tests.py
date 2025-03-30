@@ -16,6 +16,12 @@ if __name__ == "__main__":
     parser.add_argument('-r', '--reboot', dest='reboot', action='store_true',
                         default=False,
                         help='reboot the Quabo.')
+    parser.add_argument('-t', '--target', dest='target', type=str, default='quabo',
+                        help='target device(quabo or sipmsim). Default: quabo')
+    parser.add_argument('-c', '--connector', dest='connector', type=str, 
+                        choices=['J1A', 'J1B', 'J2A', 'J2B', 'J3A', 'J3B', 'J4A', 'J4B'],
+                        default=None,
+                        help='SiPM connector used for test.')
     opts = parser.parse_args()
     print(os.getcwd())
     # Step 1: get the quabo ip
@@ -59,5 +65,15 @@ if __name__ == "__main__":
         print('Quabo is not reachable.')
         exit(1)
     # Step 7: run the tests
-    #pytest.main(["./test_scripts", "--html=reports/%s/reports.html"%uid, "-p no:logging", "-v"])
-    pytest.main(["./test_scripts", "--html=reports/%s/reports.html"%uid, "-v", "-m %s"%opts.mark])
+    if opts.target == 'quabo':
+        pytest.main(["./test_scripts/test_quabo.py", "--html=reports/%s/reports_quabo.html"%uid, "-v", "-m %s"%opts.mark])
+    elif opts.target == 'sipmsim':
+        if opts.connector == None:
+            print('SiPM connector is required for SiPM simulator test.')
+            exit(1)
+        else:
+            # write the connector to the config file
+            autotest_config = Util.read_json('configs/autotest_config.json')
+            autotest_config['SiPMsimulator'] = opts.connector
+            Util.write_json('configs/autotest_config.json', autotest_config)
+            pytest.main(["./test_scripts/test_sipmsim.py", "--html=reports/%s/reports_sipmsim_%s.html"%(uid, opts.connector), "-v", "-m %s"%opts.mark])
