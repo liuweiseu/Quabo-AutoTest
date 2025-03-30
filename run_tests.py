@@ -1,6 +1,7 @@
 import pytest
 from QuaboAutoTest import *
 from argparse import ArgumentParser
+import os
 
 if __name__ == "__main__":
     # Step 0: parse the arguments
@@ -8,10 +9,15 @@ if __name__ == "__main__":
     parser.add_argument('--ip-config', dest='ip_config', type=str, 
                         default='configs/quabo_ip.json',
                         help='IP config file. Default: configs/quabo_ip.json')
+    parser.add_argument('-m', '--mark', dest='mark', type=str, 
+                        default='all',
+                        help='select the test mark(all, hk, maroc, mac, ph, movie).' 
+                         'Default: all')
     parser.add_argument('-r', '--reboot', dest='reboot', action='store_true',
                         default=False,
                         help='reboot the Quabo.')
     opts = parser.parse_args()
+    print(os.getcwd())
     # Step 1: get the quabo ip
     quabo_ip = Util.read_json(opts.ip_config)
     if quabo_ip == None:
@@ -54,4 +60,4 @@ if __name__ == "__main__":
         exit(1)
     # Step 7: run the tests
     #pytest.main(["./test_scripts", "--html=reports/%s/reports.html"%uid, "-p no:logging", "-v"])
-    pytest.main(["./test_scripts", "--html=reports/%s/reports.html"%uid, "-v"])
+    pytest.main(["./test_scripts", "--html=reports/%s/reports.html"%uid, "-v", "-m %s"%opts.mark])
