@@ -141,7 +141,7 @@
             "valid": true
         }
     },
-    "hk_tdiff": {
+    "hk_interval": {
         "val": 2.5,
         "deviation": 0.5,
         "valid": true

@@ -15,9 +15,10 @@ def test_destination_mac():
     """
     result = autotest.CheckDestMac()  
     assert result == True
-    
+
 @pytest.mark.all
 @pytest.mark.ph
+@pytest.mark.ph_peaks
 def test_ph_peaks():
     """"
     Description: 
@@ -28,6 +29,7 @@ def test_ph_peaks():
 
 @pytest.mark.all
 @pytest.mark.ph
+@pytest.mark.ph_data
 def test_ph_data():
     """"
     Description: 
@@ -38,6 +40,7 @@ def test_ph_data():
 
 @pytest.mark.all
 @pytest.mark.ph
+@pytest.mark.ph_timing
 def test_ph_data_timestamp():
     """"
     Description: 
@@ -48,6 +51,7 @@ def test_ph_data_timestamp():
 
 @pytest.mark.all
 @pytest.mark.ph
+@pytest.mark.ph_pattern
 def test_ph_pattern():
     """"
     Description: 

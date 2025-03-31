@@ -2204,11 +2204,11 @@ class QuaboTest(object):
         self.logger.info('------------------------------------')
         self.logger.info('Checking HK Timestamp Difference')
         self.logger.info('------------------------------------')
-        if self.expected_results['hk_tdiff']['valid'] == False:
+        if self.expected_results['hk_interval']['valid'] == False:
             self.logger.info('HK timestamp difference will be skipped')
             return True
-        e_val = self.expected_results['hk_tdiff']['val']
-        e_offset = self.expected_results['hk_tdiff']['deviation']
+        e_val = self.expected_results['hk_interval']['val']
+        e_offset = self.expected_results['hk_interval']['deviation']
         hk = HKRecv(self.ip)
         hk.RecvData(2)
         hk.DumpData('reports/%s/quabo/hk_timestamp.npz'%self.uid)
