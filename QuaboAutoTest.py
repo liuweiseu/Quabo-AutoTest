@@ -467,6 +467,9 @@ class Util(object):
             parse the data received from the quabo.
         Inputs:
             - data(bytearray): the data received from the quabo.
+            - timestamps(list): the timestamps of the data.
+        Outputs:
+            - parsed_data(np.array): the parsed data.
         """
         parsed_data = []
         for i in range(len(pkt)):
@@ -507,6 +510,69 @@ class Util(object):
                 sci_data[k] = struct.unpack(dtype, d)[0]
             parsed_data.append(sci_data)
         return np.array(parsed_data)
+    
+    @staticmethod
+    def ParseHKData(pkt, timestamps):
+        """
+        Description:
+            parse the housekeeping data.
+        Inputs:
+            - pkt(bytearray): the data received from the quabo.
+            - timestamps(list): the timestamps of the data.
+        Outputs:
+            - parsed_data(np.array): the parsed housekeeping data.
+        """
+        parsed_data = np.zeros(len(pkt), dtype=object)
+        for i in range(len(pkt)):
+        # parse the housekeeping data here
+            hk_data = {}
+            hk_data['timestamp'] = timestamps[i]
+            if pkt[i] is None:
+                continue
+            for k, v in HKPktDef.items():
+                offset = v['offset']
+                length = v['length']
+                flag = DType[v['type']]['flag']
+                size = DType[v['type']]['size']
+                dtype = '<%d%s'%(length/size, flag)
+                d = pkt[i][offset:offset+length]
+                # deal with some special cases
+                if k == 'uid' or k == 'fwtime':
+                    r = struct.unpack(dtype, d)[0]
+                    hk_data[k] = r
+                    continue
+                if k == 'fwver':
+                    r = struct.unpack(dtype, d)[0].decode('utf-8')[::-1]
+                    hk_data[k] = r
+                    continue
+                if k == 'boardloc':
+                    r = struct.unpack(dtype, d)[0]
+                    hk_data[k] = '192.168.%d.%d'%(r>>8, r&0xff)
+                    continue
+                # for other cases
+                # not all of the structs have lsb, constant, bit
+                try:
+                    lsb = v['lsb']
+                except:
+                    lsb = 1
+                try:
+                    constant = v['constant']
+                except:
+                    constant = 0
+                try:
+                    bit = v['bit']
+                except:
+                    bit = None
+                # start to parse hk data
+                if length == 1 and bit is None:
+                    hk_data[k] = pkt[i][offset]
+                elif length == 1 and bit is not None:
+                    hk_data[k] = (pkt[i][offset] >> bit) & 0x01
+                else:
+                    r = struct.unpack(dtype, d)[0]
+                    hk_data[k] = r * lsb + constant
+            parsed_data[i] = hk_data
+        return parsed_data
     
 class tftpw(object):
     """
