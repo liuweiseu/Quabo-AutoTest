@@ -2291,7 +2291,7 @@ class QuaboTest(object):
         self.logger.info('Checking White Rabbit Timing')
         self.logger.info('------------------------------------')
         if self.expected_results['wr']['valid'] == False:
-            self.logger.info('White Rabbit timing will be skipped')
+            self.logger.info('White Rabbit timing check will be skipped')
             return True
         integration_time = self.autotest_config['IntegrationTime']
         # config the quabo
