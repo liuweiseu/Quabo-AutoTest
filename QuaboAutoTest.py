@@ -919,7 +919,7 @@ class QuaboConfig(QuaboSock):
         """
         # create logger
         self.logger = logging.getLogger('%s.QuaboConfig'%logger)
-        self.logger.info('Quabo IP - %s'%ip_addr)
+        self.logger.debug('Quabo IP - %s'%ip_addr)
         # call the parent constructor
         try:
             super().__init__(ip_addr, QuaboConfig.PORTS['CMD'])
@@ -991,7 +991,7 @@ class QuaboConfig(QuaboSock):
         Inputs:
             - params(DAQ_PARAMS): the daq parameters.
         """
-        self.logger.info('configure DAQ parameters')
+        self.logger.debug('configure DAQ parameters')
         cmd = self.make_cmd(0x03)
         mode = 0
         if params.do_image:
@@ -1015,7 +1015,7 @@ class QuaboConfig(QuaboSock):
         cmd[12] = 69
         # if flash led is enable
         if params.do_flash:
-            self.logger.info('Flash LED is on')
+            self.logger.debug('Flash LED is on')
             cmd[22] = params.flash_rate
             self.logger.debug('Flash rate is %d (%d Hz)'%(params.flash_rate, \
                                                           LSBParams['flash']['rate'][params.flash_rate]))
@@ -1026,11 +1026,11 @@ class QuaboConfig(QuaboSock):
             self.logger.debug('Flah widht is %d (%d ns)'%(params.flash_width,\
                                                           params.flash_width * LSBParams['flash']['width']))
         else:
-            self.logger.info('Flash LED is off')
+            self.logger.debug('Flash LED is off')
         # if stim is enabled
         if params.do_stim:
             cmd[14] = 1
-            self.logger.info('STIM is on')
+            self.logger.debug('STIM is on')
             cmd[16] = params.stim_level
             # TODO: add debug info for STIM
             self.logger.debug('STIM level is %d'%params.stim_level)
@@ -1038,7 +1038,7 @@ class QuaboConfig(QuaboSock):
             self.logger.debug('STIM rate is %d (%.2f Hz)'%(params.stim_rate,
                                                            LSBParams['stim'][params.stim_rate]))
         else:
-            self.logger.info('STIM is off')
+            self.logger.debug('STIM is off')
         self.send(cmd)
 
     def PhPktDestConfig(self, dest_str):
@@ -1048,7 +1048,7 @@ class QuaboConfig(QuaboSock):
         Inputs:
             - dest_str(str): the dest ip address or hostname for PH packets.
         """
-        self.logger.info('configure PH packets destination IP: %s'%dest_str)
+        self.logger.debug('configure PH packets destination IP: %s'%dest_str)
         self.quabo_config['dest_ips']['PH'] = dest_str
     
     def moviePktDestConfig(self, dest_str):
@@ -1058,7 +1058,7 @@ class QuaboConfig(QuaboSock):
         Inputs:
             - dest_str(str): the dest ip address or hostname for movie packets.
         """
-        self.logger.info('configure movie packets destination IP: %s'%dest_str)
+        self.logger.debug('configure movie packets destination IP: %s'%dest_str)
         self.quabo_config['dest_ips']['movie'] = dest_str
 
     def SetDataPktDest(self):
@@ -1071,8 +1071,8 @@ class QuaboConfig(QuaboSock):
         ips = self.quabo_config['dest_ips']
         ph_ip = ips['PH']
         movie_ip = ips['MOVIE']
-        self.logger.info('set PH packets destination IPs: %s'%ph_ip)
-        self.logger.info('set MOVIE packets destination IPs: %s'%movie_ip)
+        self.logger.debug('set PH packets destination IPs: %s'%ph_ip)
+        self.logger.debug('set MOVIE packets destination IPs: %s'%movie_ip)
         # get the IP address from hostname
         ph_ip_addr_str = socket.gethostbyname(ph_ip)
         ph_ip_addr_bytes = Util.ip_addr_str_to_bytes(ph_ip_addr_str)
@@ -1094,11 +1094,11 @@ class QuaboConfig(QuaboSock):
             mac_addr['PH'] = struct.unpack('6B',reply[0:6])
             mac_bytes = reply[0:6]
             mac_ph = ':'.join(['%02x'%x for x in mac_bytes])
-            self.logger.info('PH packets destination MAC: %s'%mac_ph)
+            self.logger.debug('PH packets destination MAC: %s'%mac_ph)
             mac_addr['MOVIE'] = struct.unpack('6B',reply[6:12])
             mac_bytes = reply[6:12]
             mac_movie = ':'.join(['%02x'%x for x in mac_bytes])
-            self.logger.info('MOVIE packets destination MAC: %s'%mac_movie)
+            self.logger.debug('MOVIE packets destination MAC: %s'%mac_movie)
             return mac_addr
 
     def HkPacketDestConfig(self, dest_str):
@@ -1108,7 +1108,7 @@ class QuaboConfig(QuaboSock):
         Inputs:
             - dest_str(str): the dest ip address or hostname for HK packets.
         """
-        self.logger.info('configure HK packets destination IP: %s'%dest_str)
+        self.logger.debug('configure HK packets destination IP: %s'%dest_str)
         self.quabo_config['dest_ips']['HK'] = dest_str   
 
     def SetHkPacketDest(self):
@@ -1119,7 +1119,7 @@ class QuaboConfig(QuaboSock):
         # get the IP address from hostname
         dest_str = self.quabo_config['dest_ips']['HK']
         ip_addr_str = socket.gethostbyname(dest_str)
-        self.logger.info('set HK packets destination IP: %s'%ip_addr_str)
+        self.logger.debug('set HK packets destination IP: %s'%ip_addr_str)
         ip_addr_bytes = Util.ip_addr_str_to_bytes(ip_addr_str)
         cmd = self.make_cmd(0x0b)
         for i in range(4):
@@ -1426,7 +1426,7 @@ class QuaboConfig(QuaboSock):
         Outputs:
             - True if the reply is correct, otherwise False.
         """
-        self.logger.info('set MAROC parameters')
+        self.logger.debug('set MAROC parameters')
         cmd = bytearray(492)
         maroc_config = self.quabo_config['maroc']
         self._make_maroc_cmd(cmd, echo=echo)
@@ -1438,7 +1438,7 @@ class QuaboConfig(QuaboSock):
                 self.logger.error('Error: reply length is %d, but should be 492'%count)
                 return False
             else:
-                self.logger.info('reply len from MAROC: %d'%count)
+                self.logger.debug('reply len from MAROC: %d'%count)
                 for i in range(count):
                     if i >= 108 and i < 132:
                         continue
@@ -1449,7 +1449,7 @@ class QuaboConfig(QuaboSock):
                     if cmd[i] != reply[i]:
                         self.logger.error('Error: cmd[%d] = %d, but reply[%d] = %d'%(i, cmd[i], i, reply[i]))
                         return False
-                self.logger.info('MAROC parameters set successfully')
+                self.logger.debug('MAROC parameters set successfully')
                 return True
         else:
             return True
@@ -1462,7 +1462,7 @@ class QuaboConfig(QuaboSock):
             - tag(str): the tag.
             - vals(str): the values.
         """
-        self.logger.info('configure Maroc chip: %s - %s'%(tag, vals))
+        self.logger.debug('configure Maroc chip: %s - %s'%(tag, vals))
         self.quabo_config['maroc'][tag] = vals
 
     def SetHv(self, status = 'on', chan = 0b1111):
@@ -1473,12 +1473,12 @@ class QuaboConfig(QuaboSock):
         Inputs: 
             - chan: 4-bit binary number, each bit represents a channel.
         """
-        self.logger.info('set HV')
+        self.logger.debug('set HV')
         cmd = self.make_cmd(0x02)
         lsb = LSBParams['hv_setting']
         # set the hv values for the enabled channels
         if status == 'on':
-            self.logger.info('turn on HV')
+            self.logger.debug('turn on HV')
             for i in range(4):
                 if (chan & (1<<i)):
                     val = self.quabo_config['hv']['HV_%d'%i]
@@ -1490,7 +1490,7 @@ class QuaboConfig(QuaboSock):
                     cmd[2*i+3] = 0
                     self.logger.debug('HV_%d: %d (%.2f V)'%(i, 0, 0))
         elif status == 'off':
-            self.logger.info('turn off HV')
+            self.logger.debug('turn off HV')
             for i in range(4):
                 if (chan & (1<<i)):
                     cmd[2*i+2] = 0
@@ -1507,7 +1507,7 @@ class QuaboConfig(QuaboSock):
             - chan(int): the channel number.
             - value(int): the high voltage value.
         """
-        self.logger.info('configure HV: HV_%d - %d'%(chan, value))
+        self.logger.debug('configure HV: HV_%d - %d'%(chan, value))
         self.quabo_config['hv']['HV_%d'%chan] = value
 
     def _parse_trigger_parameters(self, cmd):
@@ -1533,7 +1533,7 @@ class QuaboConfig(QuaboSock):
         Description:
             send the trigger mask parameters to the quabo.
         """
-        self.logger.info('set trigger mask')
+        self.logger.debug('set trigger mask')
         cmd = self.make_cmd(0x06)
         self._parse_chanmask_parameters(cmd)
         self.flush_rx_buf()
@@ -1547,7 +1547,7 @@ class QuaboConfig(QuaboSock):
             - chan(int): the channel number.
             - value(int): the value of the parameter.
         """
-        self.logger.info('configure chanmask: CHANMASK_%d - 0x%x'%(chan, value))
+        self.logger.debug('configure chanmask: CHANMASK_%d - 0x%x'%(chan, value))
         self.quabo_config['chanmask']['CHANMASK_%d'%chan] = value
 
     def _parse_goe_mask_parameters(self, cmd):
@@ -1569,7 +1569,7 @@ class QuaboConfig(QuaboSock):
         Description:
             send the goe mask parameters to the quabo.
         """
-        self.logger.info('set GOE mask')
+        self.logger.debug('set GOE mask')
         cmd = self.make_cmd(0x0e)
         self._parse_goe_mask_parameters(cmd)
         self.flush_rx_buf()
@@ -1583,7 +1583,7 @@ class QuaboConfig(QuaboSock):
             - value(int): the value of the parameter.
         """
         # TODO: check if the value is valid
-        self.logger.info('configure GOE mask: GOE - 0x%x'%value)
+        self.logger.debug('configure GOE mask: GOE - 0x%x'%value)
         self.quabo_config['chanmask']['GOEMASK'] = value
 
     def _parse_acq_parameters(self, cmd):
@@ -1643,7 +1643,7 @@ class QuaboConfig(QuaboSock):
         Description:
             send the acquisition parameters to the quabo.
         """
-        self.logger.info('set acq parameters')
+        self.logger.debug('set acq parameters')
         cmd = self.make_cmd(0x03)
         self._parse_acq_parameters(cmd)
         self.flush_rx_buf()
@@ -1657,7 +1657,7 @@ class QuaboConfig(QuaboSock):
             - key(str): the key of the parameter.
             - value(int): the value of the parameter.
         """
-        self.logger.info('configure acq param: %s - %d'%(key, value))
+        self.logger.debug('configure acq param: %s - %d'%(key, value))
         self.quabo_config['acq'][key] = value
         
     def Reset(self):
@@ -1667,7 +1667,7 @@ class QuaboConfig(QuaboSock):
         Note: 
             this command may not be valid currently.
         """
-        self.logger.info('reset the quabo')
+        self.logger.debug('reset the quabo')
         cmd = self.make_cmd(0x04)
         self.send(cmd)
 
@@ -1681,7 +1681,7 @@ class QuaboConfig(QuaboSock):
         """
         # TODO: we don't have enough information about this command??
         # what does endzone, backoff...mean?
-        self.logger.info('set focus: steps - %d'%steps)
+        self.logger.debug('set focus: steps - %d'%steps)
         endzone = 300
         backoff = 200
         step_ontime = 10000
@@ -1711,7 +1711,7 @@ class QuaboConfig(QuaboSock):
         """
         # TODO: we don't have enough information about this command??
         # TODO: Do we still use this command?
-        self.logger.info('set shutter: status - %d'%closed)
+        self.logger.debug('set shutter: status - %d'%closed)
         cmd = self.make_cmd(0x05)
         self._shutter_open = 0 if closed else 1
         self._shutter_power = 1
@@ -1733,7 +1733,7 @@ class QuaboConfig(QuaboSock):
             - fanspeed(int): the fan speed. 
                              valid range is 0-15.
         """
-        self.logger.info('set fan: fanspeed - %d'%fanspeed)
+        self.logger.debug('set fan: fanspeed - %d'%fanspeed)
         # TODO: we don't have enough information about this command??
         self._fanspeed = fanspeed
         cmd = self.make_cmd(0x85)
@@ -1750,7 +1750,7 @@ class QuaboConfig(QuaboSock):
         Inputs:
             - closed(bool): whether to close the shutter.
         """
-        self.logger.info('set shutter(new): status - %d'%closed)
+        self.logger.debug('set shutter(new): status - %d'%closed)
         cmd = self.make_cmd(0x08)
         cmd[1] = 0x01 if closed else 0x0
         self.send(cmd)
@@ -1762,7 +1762,7 @@ class QuaboConfig(QuaboSock):
         Inputs:
             - val(bool): whether to turn on the led flash
         """
-        self.logger.info('set led flasher: status - %d'%val)
+        self.logger.debug('set led flasher: status - %d'%val)
         cmd = self.make_cmd(0x09)
         cmd[1] = 0x01 if val else 0x0
         self.send(cmd)
@@ -1772,7 +1772,7 @@ class QuaboConfig(QuaboSock):
         Description:
             calibrate the pulse height baseline.
         """
-        self.logger.info('cal PH baseline')
+        self.logger.debug('cal PH baseline')
         cmd = self.make_cmd(0x07)
         self.flush_rx_buf()
         self.send(cmd)
@@ -1792,7 +1792,7 @@ class QuaboConfig(QuaboSock):
         Inputs:
             - config_file(str): the config file path.
         """
-        self.logger.info('write IPs config to a file')
+        self.logger.debug('write IPs config to a file')
         try:
             with open(config_file, 'rb') as f:
                 cfg = json.load(f)
@@ -1810,7 +1810,7 @@ class QuaboConfig(QuaboSock):
         Inputs:
             - config_file(str): the config file path.
         """
-        self.logger.info('write MAROC config to a file')
+        self.logger.debug('write MAROC config to a file')
         try:
             with open(config_file, 'rb') as f:
                 cfg = json.load(f)
@@ -1828,7 +1828,7 @@ class QuaboConfig(QuaboSock):
         Inputs:
             - config_file(str): the config file path.
         """
-        self.logger.info('write mask config to a file')
+        self.logger.debug('write mask config to a file')
         try:
             with open(config_file, 'rb') as f:
                 cfg = json.load(f)
@@ -1859,8 +1859,8 @@ class HKRecv(QuaboSock):
         super().__init__(ip_addr, HKRecv.PORTS['HK'],timeout=timeout)
         self.logger = logging.getLogger('%s.HKRecv'%logger)
         self.logger.setLevel(logging.DEBUG)
-        self.logger.info('Init HKRecv class - IP: %s'%ip_addr)
-        self.logger.info('Init HKRecv class - PORT: %d'%HKRecv.PORTS['HK'])
+        self.logger.debug('Init HKRecv class - IP: %s'%ip_addr)
+        self.logger.debug('Init HKRecv class - PORT: %d'%HKRecv.PORTS['HK'])
         self.data = None
         self.timestamp = None
     
@@ -1871,7 +1871,7 @@ class HKRecv(QuaboSock):
         Inputs:
             - n(int): the number of packets to receive.
         """
-        self.logger.info('receive HK data')
+        self.logger.debug('receive HK data')
         self.data = np.zeros(n, dtype=object)
         self.timestamp = np.zeros(n, dtype=float)
         for i in range(n):
@@ -1895,7 +1895,7 @@ class HKRecv(QuaboSock):
             - parsed_data(list): the parsed housekeeping data.
         """
         parsed_data = np.zeros(len(self.data), dtype=object)
-        self.logger.info('parse HK data')
+        self.logger.debug('parse HK data')
         for i in range(len(self.data)):
         # parse the housekeeping data here
             hk_data = {}
@@ -1966,7 +1966,7 @@ class HKRecv(QuaboSock):
         Inputs:
             - filename(str): the file name.
         """
-        self.logger.info('dump HK data to %s'%filename)
+        self.logger.debug('dump HK data to %s'%filename)
         datadir = os.path.dirname(filename)
         if not os.path.exists(datadir):
             os.makedirs(datadir)
@@ -1997,8 +1997,8 @@ class DataRecv(QuaboSock):
         super().__init__(ip_addr, DataRecv.PORTS['DATA'])
         self.sock.setsockopt(socket.SOL_SOCKET, socket.SO_RCVBUF, DataRecv.RECVBUFFSIZE)
         self.logger = logging.getLogger('%s.DataRecv'%logger)
-        self.logger.info('Init DataRecv class - IP: %s'%ip_addr)
-        self.logger.info('Init DataRecv class - PORT: %d'%DataRecv.PORTS['DATA'])
+        self.logger.debug('Init DataRecv class - IP: %s'%ip_addr)
+        self.logger.debug('Init DataRecv class - PORT: %d'%DataRecv.PORTS['DATA'])
         self.data = None
         self.timestamp = None
 
@@ -2010,7 +2010,7 @@ class DataRecv(QuaboSock):
             - n(int): the number of packets to receive.
             - mode(str): the mode of the data, '8bit' or '16bit'.
         """
-        self.logger.info('receive science data')
+        self.logger.debug('receive science data')
         self.data = np.zeros(n, dtype=object)
         self.timestamp = np.zeros(n, dtype=float)
         for i in range(n):
@@ -2033,7 +2033,7 @@ class DataRecv(QuaboSock):
         Inputs:
             - data(bytearray): the data received from the quabo.
         """
-        self.logger.info('parse science data')
+        self.logger.debug('parse science data')
         parsed_data = []
         for i in range(len(self.data)):
             if self.data[i] is None:
@@ -2086,7 +2086,7 @@ class DataRecv(QuaboSock):
         Inputs:
             - filename(str): the file name.
         """
-        self.logger.info('dump science data to %s'%filename)
+        self.logger.debug('dump science data to %s'%filename)
         datadir = os.path.dirname(filename)
         if not os.path.exists(datadir):
             os.makedirs(datadir)
