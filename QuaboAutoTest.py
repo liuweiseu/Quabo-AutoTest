@@ -2327,8 +2327,16 @@ class QuaboTest(object):
         if max_timestamps > 10**9:
             passed = False
             self.logger.error('Error: White Rabbit timestamp - max timestamp(%d) is greater than 1 second'%max_timestamps)
-        # check the timestamps difference
-        tdiff = np.diff(timestamps)
+        # calculate the timestamps difference
+        tdiff = []
+        for i in range(len(timestamps)-1):
+            t0 = timestamps[i]
+            t1 = timestamps[i+1]
+            if t1 < t0:
+                t1 += 10**9
+            tdiff.append(t1 - t0)
+        tdiff = np.array(tdiff)
+        # check the max and min of the timestamps difference
         if np.max(tdiff) != integration_time or np.min(tdiff) != integration_time:
             passed = False
             self.logger.error('Error: White Rabbit timestamp - max timestamp difference(%d) is not equal to integration time(%d)'%(np.max(tdiff), integration_time))
