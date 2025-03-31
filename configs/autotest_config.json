@@ -1,6 +1,6 @@
 {
     "BoardRev": "bga",
-    "SiPMsimulator": "J1B",
+    "SiPMsimulator": "J4B",
     "NPhPkt": 1000,
     "NPhPeaks": 32,
     "PHThreshold": 300,

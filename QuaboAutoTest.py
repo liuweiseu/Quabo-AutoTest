@@ -2336,15 +2336,24 @@ class QuaboTest(object):
                 t1 += 10**9
             tdiff.append(t1 - t0)
         tdiff = np.array(tdiff)
-        # check the max and min of the timestamps difference
-        if np.max(tdiff) != integration_time or np.min(tdiff) != integration_time*10**3:
+        # check the max timestamps difference
+        if np.max(tdiff) != integration_time*10**3:
             passed = False
             self.logger.error('Error: White Rabbit timestamp - max timestamp difference(%d) is not equal to integration time(%d)'%(np.max(tdiff), integration_time*10**3))
-            self.logger.error('Error: White Rabbit timestamp - min timestamp difference(%d) is not equal to integration time(%d)'%(np.min(tdiff), integration_time*10**3))   
+        else:
+            self.logger.info('Info: White Rabbit timestamp - max timestamp difference(%d) is equal to integration time(%d)'%(np.max(tdiff), integration_time*10**3))
+        # check the min of the timestamps difference
+        if np.min(tdiff) != integration_time*10**3:
+            passed = False
+            self.logger.error('Error: White Rabbit timestamp - min timestamp difference(%d) is not equal to integration time(%d)'%(np.min(tdiff), integration_time*10**3))  
+        else:
+            self.logger.info('Info: White Rabbit timestamp - min timestamp difference(%d) is equal to integration time(%d)'%(np.min(tdiff), integration_time*10**3)) 
         # check the mean of the timestamps difference
         if np.mean(tdiff) != integration_time*10**3:
             passed = False
-            self.logger.error('Error: White Rabbit timestamp - mean timestamp difference(%.02f) is not equal to integration time(%d)'%(np.mean(tdiff), integration_time*10**3))  
+            self.logger.error('Error: White Rabbit timestamp - mean timestamp difference(%.02f) is not equal to integration time(%d)'%(np.mean(tdiff), integration_time*10**3)) 
+        else:
+            self.logger.info('Info: White Rabbit timestamp - mean timestamp difference(%.02f) is equal to integration time(%d)'%(np.mean(tdiff), integration_time*10**3)) 
         return passed   
     
 

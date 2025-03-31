@@ -2,3 +2,4 @@ pytest
 tftpy
 ping3
 netifaces
+numpy

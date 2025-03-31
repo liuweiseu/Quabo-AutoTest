@@ -9,7 +9,7 @@ Here are the tests we do in this software:
 3. MAC address  
     (a) `mac`: check if the Microblaze core gets the correct MAC address for PH and MOVIE packets.  
 4. White Rabbit Timing/Movie mode  
-    (a) `wr_timing`: check the timestamps in the MOVIE packets to see if White Rabbit works or not.  
+    (a) `wr_timing`: check the timestamps in the MOVIE packets to see if White Rabbit works or not, which includes the max timestamps and the timestamps difference.
 5. PH mode(**SiPM simulator board is required**)  
     (a) `ph_data`: check the mean/std/max/min of the pulse values;  
     (b) `ph_timing`: check the interval time for the PH packets, which is related to SiPM simulator board setting;  

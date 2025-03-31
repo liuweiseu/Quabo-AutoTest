@@ -11,7 +11,9 @@ if __name__ == "__main__":
                         help='IP config file. Default: configs/quabo_ip.json')
     parser.add_argument('-m', '--mark', dest='mark', type=str, 
                         default='all',
-                        help='select the test mark(all, hk, maroc, mac, ph, movie).' 
+                        choices=['all', 'hk_vals', 'hk_time', 'maroc', 'mac', 'wr_timing',
+                                 'ph', 'ph_data', 'ph_timing', 'ph_peaks', 'ph_pattern'],
+                        help='select the test marker.' 
                          'Default: all')
     parser.add_argument('-r', '--reboot', dest='reboot', action='store_true',
                         default=False,
