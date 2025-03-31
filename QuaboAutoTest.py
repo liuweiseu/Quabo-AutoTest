@@ -2519,7 +2519,7 @@ class SiPMSimTest(QuaboTest):
             - bool: True if the test passed, False otherwise.
         """
         self.logger.info('------------------------------------')
-        self.logger.info('Checking PH Data')
+        self.logger.info('Checking Pulse Height')
         self.logger.info('------------------------------------')
         expected_results = self.expected_results['ph_data']
         # config the quabo
@@ -2554,7 +2554,7 @@ class SiPMSimTest(QuaboTest):
             self.logger.error('Error: PH data check failed')
             return False
         # dump the data
-        ph.DumpData('reports/%s/sipmsim/ph_data.npz'%self.uid)
+        ph.DumpData('reports/%s/sipmsim/ph_pulse_height.npz'%self.uid)
         # check the PH data
         peaks = []
         for d in phpkt:
@@ -2565,10 +2565,10 @@ class SiPMSimTest(QuaboTest):
         peaks_max = np.max(peaks)
         peaks_min = np.min(peaks)
         actual_vals = {}
-        actual_vals['mean'] = peaks_mean
-        actual_vals['std'] = peaks_std
-        actual_vals['max'] = peaks_max
-        actual_vals['min'] = peaks_min
+        actual_vals['mean_pulse_height'] = peaks_mean
+        actual_vals['std_pulse_height'] = peaks_std
+        actual_vals['max_pulse_height'] = peaks_max
+        actual_vals['min_pulse_height'] = peaks_min
         # check the results
         return self.CheckResults(expected_results, actual_vals)
 
@@ -2580,10 +2580,10 @@ class SiPMSimTest(QuaboTest):
             - bool: True if the test passed, False otherwise.
         """
         self.logger.info('------------------------------------')
-        self.logger.info('Checking PH Timestamp Difference')
+        self.logger.info('Checking Pulse Rate')
         self.logger.info('------------------------------------')
         if self.expected_results['ph_pulse_rate']['valid'] == False:
-            self.logger.info('PH timestamp difference will be skipped')
+            self.logger.info('Pulse Rate Check will be skipped')
             return True
         e_val = self.expected_results['ph_pulse_rate']['val']
         e_offset = self.expected_results['ph_pulse_rate']['deviation']
@@ -2619,7 +2619,7 @@ class SiPMSimTest(QuaboTest):
             self.logger.error('Error: PH timing check failed')
             return False
         # dump the data
-        ph.DumpData('reports/%s/sipmsim/ph_timestamp.npz'%self.uid)
+        ph.DumpData('reports/%s/sipmsim/ph_pulse_rate.npz'%self.uid)
         # get the timestamp
         timestamps = []
         for d in phpkt:
@@ -2628,10 +2628,10 @@ class SiPMSimTest(QuaboTest):
         timestamps_diff = np.diff(timestamps)
         a_val = 1/np.mean(timestamps_diff)
         if abs(e_val) - e_offset > abs(a_val) or abs(e_val) + e_offset < abs(a_val):
-            self.logger.error('Error: PH timestamp difference - Expected val(%.02f)/deviation(%.02f) is not equal to %.02f'%(e_val, e_offset, a_val))
+            self.logger.error('Error: Pulse Rate - Expected val(%.02f)/deviation(%.02f) is not equal to %.02f'%(e_val, e_offset, a_val))
             return False
         else:
-            self.logger.info('Info: PH timestamp difference - Expected val(%.02f)/deviation(%.02f) is equal to %.02f'%(e_val, e_offset, a_val))
+            self.logger.info('Info: Pulse Rate - Expected val(%.02f)/deviation(%.02f) is equal to %.02f'%(e_val, e_offset, a_val))
             return True
 
     def CheckPHPattern(self):

@@ -150,24 +150,24 @@
         "valid": true
     },
     "ph_data": {
-        "max": {
+        "max_pulse_height": {
             "val": 2900,
-            "deviation": 200,
+            "deviation": 300,
             "valid": true
         },
-        "min": {
+        "min_pulse_height": {
             "val": 2900,
-            "deviation": 200,
+            "deviation": 300,
             "valid": true
         },
-        "mean": {
+        "mean_pulse_height": {
             "val": 2900,
-            "deviation": 200,
+            "deviation": 300,
             "valid": true
         },
-        "std": {
+        "std_pulse_height": {
             "val": 60,
-            "deviation": 20,
+            "deviation": 40,
             "valid": true
         }
     },
