@@ -33,14 +33,5 @@ def test_maroc_config():
     result = autotest.CheckMarocConfig()  
     assert result == True
 
-@pytest.mark.all
-@pytest.mark.mac
-def test_destination_mac():
-    """"
-    Description: 
-        Check the destination MAC address
-    """
-    result = autotest.CheckDestMac()  
-    assert result == True
 
 

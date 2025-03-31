@@ -22,6 +22,10 @@ if __name__ == "__main__":
                         choices=['J1A', 'J1B', 'J2A', 'J2B', 'J3A', 'J3B', 'J4A', 'J4B'],
                         default=None,
                         help='SiPM connector used for test.')
+    parser.add_argument('-b', '--board', dest='board', type=str, 
+                        choices=['bga', 'bga'],
+                        default='bga',
+                        help='board version. Default: bga')
     opts = parser.parse_args()
     print(os.getcwd())
     # Step 1: get the quabo ip
@@ -75,5 +79,6 @@ if __name__ == "__main__":
             # write the connector to the config file
             autotest_config = Util.read_json('configs/autotest_config.json')
             autotest_config['SiPMsimulator'] = opts.connector
+            autotest_config['BoardRev'] = opts.board
             Util.write_json('configs/autotest_config.json', autotest_config)
             pytest.main(["./test_scripts/test_sipmsim.py", "--html=reports/%s/reports_sipmsim_%s.html"%(uid, opts.connector), "-v", "-m %s"%opts.mark])

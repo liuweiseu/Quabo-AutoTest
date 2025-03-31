@@ -459,414 +459,6 @@ class Util(object):
                             mac_address = addresses[netifaces.AF_LINK][0]['addr']
                             return mac_address
         return None
-
-class QuaboTest(object):
-    """
-    Description:
-        The QuaboTest class is used to test the quabo.
-    """    
-    def __init__(self, ip_file='configs/quabo_ip.json', autotest_config_file= 'configs/autotest_config.json', expected_results_file='configs/expected_results.json'):
-        """
-        Description:
-            The constructor of QuaboTest class.
-        Inputs:
-            - uid(str): the uid of the quabo.
-        """
-        # get the quabo ip
-        quabo_ip = Util.read_json(ip_file)
-        self.ip = quabo_ip['ip']
-        # create tftpw client
-        self.client = tftpw(self.ip)
-        # get the auto test config
-        self.autotest_config = Util.read_json(autotest_config_file)
-        # read the expected results
-        self.expected_results = Util.read_json(expected_results_file)
-        # get uid
-        self.uid = self.client.get_flashuid()
-        # create logger
-        self.logger = Util.create_logger('reports/%s/reports_quabo.log'%self.uid, mode='w', tag='QuaboAutoTest')
-        self.logger.info('Quabo UID - %s'%self.uid)
-
-    def CheckResults(self, expected_results, actual_results):
-        """
-        Description:
-            Check the results of the test.
-        Input:
-            expected_results(dict): expected results
-            actual_results(dict): actual results
-        Output:
-            result(bool): True if the test passed, False otherwise
-        """
-        passed = True
-        for k,v in expected_results.items():
-            if v['valid'] == False:
-                continue
-            e_val = v['val']
-            e_offset = v['deviation']
-            a_val = actual_results[k]
-            if type(e_val) == str:
-                if e_val != a_val:
-                    passed = False
-                    self.logger.error('Error: %s - expected val(%s) is not equal to acutal val(%s)'%(k, e_val, a_val))
-                else:
-                    self.logger.info('Info: %s - expected val(%s) is equal to actual val(%s)'%(k, e_val, a_val))
-            else:
-                if abs(e_val) - e_offset > abs(a_val) or abs(e_val) + e_offset < abs(a_val):
-                    passed = False
-                    if type(e_val) == int:
-                        if e_offset == 0:
-                            self.logger.error('Error: %s - expected val(%d) is not equal to %d'%(k, e_val, a_val))
-                        else:
-                            self.logger.error('Error: %s - expected val(%d)/deviation(%d) is not equal to %d'%(k, e_val, e_offset, a_val))
-                    elif type(e_val) == float:
-                        if e_offset == 0:
-                            self.logger.error('Error: %s - expected val(%.02f) is not equal to %.02f'%(k, e_val, a_val))
-                        else:
-                            self.logger.error('Error: %s - expected val(%.02f)/deviation(%.02f) is not equal to %.02f'%(k, e_val, e_offset, a_val))
-                else:
-                    if type(e_val) == int:
-                        if e_offset == 0:
-                            self.logger.info('Info: %s - expected val(%d) is equal to actual val(%d)'%(k, e_val, a_val))
-                        else:
-                            self.logger.info('Info: %s - expected val(%d)/deviation(%d) is equal to actual val(%d)'%(k, e_val, e_offset, a_val))
-                    elif type(e_val) == float:
-                        if e_offset == 0:
-                            self.logger.info('Info: %s - expected val(%.02f) is equal to actual val(%.02f)'%(k, e_val, a_val))
-                        else:
-                            self.logger.info('Info: %s - expected val(%.02f)/deviation(%.02f) is equal to actual val(%.02f)'%(k, e_val, e_offset, a_val))
-        return passed
-
-    def CheckHKPktVals(self):
-        """
-        Description:
-            Check the HK packets.
-        Outputs:
-            - bool: True if the test passed, False otherwise.
-        """
-        self.logger.info('------------------------------------')
-        self.logger.info('Checking HK Values')
-        self.logger.info('------------------------------------')
-        expected_results = self.expected_results['hk_vals']
-        # config the quabo
-        qc = QuaboConfig(self.ip)
-        # set the HK packet destination
-        qc.SetHkPacketDest()
-        # turn on the high voltage
-        qc.SetHv('on')
-        # wait for a few seconds to let the quabo warm up
-        time.sleep(5)
-        hk = HKRecv(self.ip)
-        hk.RecvData()
-        qc.SetHv('off')
-        qc.close()
-        hk.close()
-        hk.DumpData('reports/%s/quabo/hk_vals.npz'%self.uid)
-        hkpkt = hk.ParseData()
-        return self.CheckResults(expected_results, hkpkt[0])
-
-    def CheckHKTimestamp(self):
-        """
-        Description:
-            Check the HK timestamp.
-        """
-        self.logger.info('------------------------------------')
-        self.logger.info('Checking HK Timestamp Difference')
-        self.logger.info('------------------------------------')
-        if self.expected_results['hk_tdiff']['valid'] == False:
-            self.logger.info('HK timestamp difference will be skipped')
-            return True
-        e_val = self.expected_results['hk_tdiff']['val']
-        e_offset = self.expected_results['hk_tdiff']['deviation']
-        hk = HKRecv(self.ip)
-        hk.RecvData(2)
-        hk.DumpData('reports/%s/quabo/hk_timestamp.npz'%self.uid)
-        hkpkt = hk.ParseData()
-        hk.close()
-        # get the time difference
-        a_val = hkpkt[1]['timestamp'] - hkpkt[0]['timestamp']
-        if abs(e_val) - e_offset > abs(a_val) or abs(e_val) + e_offset < abs(a_val):
-            self.logger.error('Error: HK timestamp difference - Expected val(%.02f)/deviation(%.02f) is not equal to %.02f'%(e_val, e_offset, a_val))
-            return False
-        else:
-            self.logger.info('Info: HK timestamp difference - Expected val(%.02f)/deviation(%.02f) is equal to %.02f'%(e_val, e_offset, a_val))
-            return True
-    
-    def CheckMarocConfig(self):
-        """
-        Description:
-            Check the Quabo configuration.
-        Outputs:
-            - bool: True if the test passed, False otherwise.
-        """
-        self.logger.info('------------------------------------')
-        self.logger.info('Checking MAROC Chip Configuration')
-        self.logger.info('------------------------------------')
-        qc = QuaboConfig(self.ip)
-        # we have to set the MAROC params twice
-        r = qc.SetMarocParams()
-        r = qc.SetMarocParams()
-        qc.close()
-        if r:
-            self.logger.info('MAROC Chip is configured correctly')
-        else:
-            self.logger.error('MAROC Chip is not configured correctly')
-        return r
-
-    def CheckDestMac(self):
-        """
-        Description:
-            Check the destination MAC address for PH and Movie pachets.
-        """
-        self.logger.info('------------------------------------')
-        self.logger.info('Checking Destination MAC Address')
-        self.logger.info('------------------------------------')
-        if self.expected_results['dest_mac']['valid'] == False:
-            self.logger.info('Destination MAC address will be skipped')
-            return True
-        qc = QuaboConfig(self.ip)
-        # get the destination MAC address
-        macs = qc.SetDataPktDest()
-        qc.close()
-        quabo_config = Util.read_json('configs/quabo_config.json')
-        # get the destination MAC address for PH packets
-        ph_dest_ip = quabo_config['dest_ips']['PH']
-        self.logger.info('PH destination IP address: %s'%ph_dest_ip)
-        ph_mac_local = Util.get_mac_by_ip(ph_dest_ip)
-        self.logger.info('PH MAC address got on local machine: %s'%ph_mac_local)
-        ph_mac_quabo = ":".join("{:02x}".format(b) for b in macs['PH'])
-        self.logger.info('PH MAC address got on Quabo: %s'%ph_mac_quabo)
-        # get the destination MAC address for Movie packets
-        movie_dest_ip = quabo_config['dest_ips']['MOVIE']
-        self.logger.info('Movie destination IP address: %s'%movie_dest_ip)
-        movive_mac_local = Util.get_mac_by_ip(movie_dest_ip)
-        self.logger.info('Movie MAC address got on local machine: %s'%movive_mac_local)
-        movie_mac = ":".join("{:02x}".format(b) for b in macs['MOVIE'])
-        self.logger.info('Movie MAC address got on Quabo: %s'%movie_mac)
-        if ph_mac_local == ph_mac_quabo and movive_mac_local == movie_mac:
-            self.logger.info('Destination MAC address is correct')
-            return True
-        else:
-            self.logger.error('Destination MAC address is not correct')
-            return False
-
-    def CheckWR(self):
-        """
-        Description:
-            Check the White Rabbit timing.
-        """
-    
-
-class SiPMSimTest(QuaboTest):
-    """
-    Description:
-        The SiPMSimTest class is used to test the pixel.
-    """
-    PIXEL_PER_CONNECTOR = 32
-    def __init__(self, connector='J1A', ip_file='configs/quabo_ip.json', expected_results_file='configs/expected_results.json'):
-        """
-        Description:
-            The constructor of SiPMSimTest class.
-        Inputs:
-            - connector(str): the connector of the pixel.
-        """
-        super().__init__(ip_file = ip_file, expected_results_file = expected_results_file)
-        self.connector = connector
-        # create logger
-        self.logger = Util.create_logger('reports/%s/reports_sipm_%s.log'%(self.uid, self.connector), mode='w', tag='SiPMSimTest')
-        self.logger.info('Quabo UID - %s'%self.uid)
-    
-    def _CheckPatternMatch(d, p):
-        """
-        Description:
-            Check if the data and pattern match to each other.
-        Inputs:
-            - d(np.darray): the data to check.
-            - p(np.darray): the pattern to check.
-        Outputs:
-            - bool: True if the data and pattern match, False otherwise.
-        """
-        match = False
-        for i in range(len(p)):
-            if p[i] == d[0]:
-                for j in range(len(d)):
-                    k = (i + j)%len(p)
-                    if p[k] != d[j]:
-                        break
-                    elif j == len(d) - 1:
-                        match = True
-        return match
-
-    def CheckPHPattern(self):
-        """
-        Description:
-            Check the PH data pattern.
-        Outputs:
-            - bool: True if the test passed, False otherwise.
-        """
-        self.logger.info('------------------------------------')
-        self.logger.info('Checking PH Data Pattern')
-        self.logger.info('------------------------------------')
-
-    def CheckPHPeaks(self):
-        """
-        Description:
-            Check how many peaks are in the PH data.
-        """
-        self.logger.info('------------------------------------')
-        self.logger.info('Checking PH Peaks')
-        self.logger.info('------------------------------------')
-        if self.expected_results['ph_npeak']['valid'] == False:
-            self.logger.info('PH peaks will be skipped')
-            return True
-        e_val = self.expected_results['ph_npeak']['val']
-        e_offset = self.expected_results['ph_npeak']['deviation']
-        # config the quabo
-        qc = QuaboConfig(self.ip)
-        # set the PH packet destination
-        qc.SetDataPktDest()
-        # turn on the high voltage
-        qc.SetHv('on')
-        # configure the MAROC parameters
-        qc.SetMarocParams()
-        # set the PH packet mode
-        params = DAQ_PARAMS(do_image=False, image_us=1000, image_8bit=False, do_ph=True,bl_subtract=True)
-        qc.DaqParamsConfig(params)
-        # wait for a few seconds to let the quabo warm up
-        time.sleep(2)
-        ph = DataRecv(self.ip)
-        ph.RecvData(self.autotest_config['NPhPeaks'])
-        # turn off the high voltage
-        qc.SetHv('off')
-        # turn off the PH packet mode
-        params = DAQ_PARAMS(do_image=False, image_us=1000, image_8bit=False, do_ph=False,bl_subtract=True)
-        qc.DaqParamsConfig(params)
-        qc.close()
-        ph.close()
-        ph.DumpData('reports/%s/sipmsim/ph_peaks.npz'%self.uid)
-        # parse the PH data
-        phpkt = ph.ParseData()
-        # check the PH data
-        npeaks = []
-        for d in phpkt:
-            n = 0
-            mean = np.mean(d['data'])
-            for i in range(len(d['data'])):
-                if d['data'][i] > self.autotest_config['PHThreshold'] + mean:
-                    n += 1
-            npeaks.append(n)
-        npeaks = np.array(npeaks)
-        a_val = np.mean(npeaks)
-        if a_val != e_val:
-            self.logger.error('Error: PH peaks - Expected val(%d) is not equal to %.02f'%(e_val, a_val))
-            return False
-        else:
-            self.logger.info('Info: PH peaks - Expected val(%d) is equal to %.02f'%(e_val, a_val))
-            return True
-        
-    def CheckPHdata(self):
-        """
-        Description:
-            Check the PH data.
-        Outputs:
-            - bool: True if the test passed, False otherwise.
-        """
-        self.logger.info('------------------------------------')
-        self.logger.info('Checking PH Data')
-        self.logger.info('------------------------------------')
-        expected_results = self.expected_results['ph_data']
-        # config the quabo
-        qc = QuaboConfig(self.ip)
-        # set the PH packet destination
-        qc.SetDataPktDest()
-        # turn on the high voltage
-        qc.SetHv('on')
-        # configure the MAROC parameters
-        qc.SetMarocParams()
-        # set the PH packet mode
-        params = DAQ_PARAMS(do_image=False, image_us=1000, image_8bit=False, do_ph=True,bl_subtract=True)
-        qc.DaqParamsConfig(params)
-        # wait for a few seconds to let the quabo warm up
-        time.sleep(2)
-        ph = DataRecv(self.ip)
-        ph.RecvData(self.autotest_config['NPhPkt'])
-        # turn off the high voltage
-        qc.SetHv('off')
-        # turn off the PH packet mode
-        params = DAQ_PARAMS(do_image=False, image_us=1000, image_8bit=False, do_ph=False,bl_subtract=True)
-        qc.DaqParamsConfig(params)
-        qc.close()
-        ph.close()
-        ph.DumpData('reports/%s/sipmsim/ph_data.npz'%self.uid)
-        phpkt = ph.ParseData()
-        # check the PH data
-        peaks = []
-        for d in phpkt:
-            peaks.append(max(d['data']))
-        peaks = np.array(peaks)
-        peaks_mean = np.mean(peaks)
-        peaks_std = np.std(peaks)
-        peaks_max = np.max(peaks)
-        peaks_min = np.min(peaks)
-        actual_vals = {}
-        actual_vals['mean'] = peaks_mean
-        actual_vals['std'] = peaks_std
-        actual_vals['max'] = peaks_max
-        actual_vals['min'] = peaks_min
-        # check the results
-        return self.CheckResults(expected_results, actual_vals)
-
-    def CheckPHTimestamp(self):
-        """
-        Description:
-            Check the PH timestamp.
-        Outputs:
-            - bool: True if the test passed, False otherwise.
-        """
-        self.logger.info('------------------------------------')
-        self.logger.info('Checking PH Timestamp Difference')
-        self.logger.info('------------------------------------')
-        if self.expected_results['ph_pulse_rate']['valid'] == False:
-            self.logger.info('PH timestamp difference will be skipped')
-            return True
-        e_val = self.expected_results['ph_pulse_rate']['val']
-        e_offset = self.expected_results['ph_pulse_rate']['deviation']
-        # config the quabo
-        qc = QuaboConfig(self.ip)
-        # set the PH packet destination
-        qc.SetDataPktDest()
-        # turn on the high voltage
-        qc.SetHv('on')
-        # configure the MAROC parameters
-        qc.SetMarocParams()
-        # set the PH packet mode
-        params = DAQ_PARAMS(do_image=False, image_us=1000, image_8bit=False, do_ph=True,bl_subtract=True)
-        qc.DaqParamsConfig(params)
-        # wait for a few seconds to let the quabo warm up
-        time.sleep(2)
-        ph = DataRecv(self.ip)
-        ph.RecvData(self.autotest_config['NPhPkt'])
-        # turn off the high voltage
-        qc.SetHv('off')
-        # turn off the PH packet mode
-        params = DAQ_PARAMS(do_image=False, image_us=1000, image_8bit=False, do_ph=False,bl_subtract=True)
-        qc.DaqParamsConfig(params)
-        qc.close()
-        ph.close()
-        ph.DumpData('reports/%s/sipmsim/ph_timestamp.npz'%self.uid)
-        phpkt = ph.ParseData()
-        # get the timestamp
-        timestamps = []
-        for d in phpkt:
-            timestamps.append(d['timestamp'])
-        timestamps = np.array(timestamps, dtype=np.float64)
-        timestamps_diff = np.diff(timestamps)
-        a_val = 1/np.mean(timestamps_diff)
-        if abs(e_val) - e_offset > abs(a_val) or abs(e_val) + e_offset < abs(a_val):
-            self.logger.error('Error: PH timestamp difference - Expected val(%.02f)/deviation(%.02f) is not equal to %.02f'%(e_val, e_offset, a_val))
-            return False
-        else:
-            self.logger.info('Info: PH timestamp difference - Expected val(%.02f)/deviation(%.02f) is equal to %.02f'%(e_val, e_offset, a_val))
-            return True
     
 class tftpw(object):
     """
@@ -2278,6 +1870,7 @@ class DataRecv(QuaboSock):
          '8bit': 272,
          '16bit': 528    
     }
+    RECVBUFFSIZE = 212992
     def __init__(self, ip_addr, timeout=0.5, logger='Quabo'):
         """
         Description:
@@ -2288,6 +1881,7 @@ class DataRecv(QuaboSock):
             - logger(str): the logger name.
         """
         super().__init__(ip_addr, DataRecv.PORTS['DATA'])
+        self.sock.setsockopt(socket.SOL_SOCKET, socket.SO_RCVBUF, DataRecv.RECVBUFFSIZE)
         self.logger = logging.getLogger('%s.DataRecv'%logger)
         self.logger.info('Init DataRecv class - IP: %s'%ip_addr)
         self.logger.info('Init DataRecv class - PORT: %d'%DataRecv.PORTS['DATA'])
@@ -2383,3 +1977,474 @@ class DataRecv(QuaboSock):
         if not os.path.exists(datadir):
             os.makedirs(datadir)
         np.savez(filename, data=self.data, timestamp=self.timestamp)
+
+class QuaboTest(object):
+    """
+    Description:
+        The QuaboTest class is used to test the quabo.
+    """    
+    def __init__(self, ip_file='configs/quabo_ip.json', autotest_config_file= 'configs/autotest_config.json', expected_results_file='configs/expected_results.json'):
+        """
+        Description:
+            The constructor of QuaboTest class.
+        Inputs:
+            - uid(str): the uid of the quabo.
+        """
+        # get the quabo ip
+        quabo_ip = Util.read_json(ip_file)
+        self.ip = quabo_ip['ip']
+        # create tftpw client
+        self.client = tftpw(self.ip)
+        # get the auto test config
+        self.autotest_config = Util.read_json(autotest_config_file)
+        # read the expected results
+        self.expected_results = Util.read_json(expected_results_file)
+        # get uid
+        self.uid = self.client.get_flashuid()
+        # create logger
+        self.logger = Util.create_logger('reports/%s/reports_quabo.log'%self.uid, mode='w', tag='QuaboAutoTest')
+        self.logger.info('Quabo UID - %s'%self.uid)
+
+    def CheckResults(self, expected_results, actual_results):
+        """
+        Description:
+            Check the results of the test.
+        Input:
+            expected_results(dict): expected results
+            actual_results(dict): actual results
+        Output:
+            result(bool): True if the test passed, False otherwise
+        """
+        passed = True
+        for k,v in expected_results.items():
+            if v['valid'] == False:
+                continue
+            e_val = v['val']
+            e_offset = v['deviation']
+            a_val = actual_results[k]
+            if type(e_val) == str:
+                if e_val != a_val:
+                    passed = False
+                    self.logger.error('Error: %s - expected val(%s) is not equal to acutal val(%s)'%(k, e_val, a_val))
+                else:
+                    self.logger.info('Info: %s - expected val(%s) is equal to actual val(%s)'%(k, e_val, a_val))
+            else:
+                if abs(e_val) - e_offset > abs(a_val) or abs(e_val) + e_offset < abs(a_val):
+                    passed = False
+                    if type(e_val) == int:
+                        if e_offset == 0:
+                            self.logger.error('Error: %s - expected val(%d) is not equal to %d'%(k, e_val, a_val))
+                        else:
+                            self.logger.error('Error: %s - expected val(%d)/deviation(%d) is not equal to %d'%(k, e_val, e_offset, a_val))
+                    elif type(e_val) == float:
+                        if e_offset == 0:
+                            self.logger.error('Error: %s - expected val(%.02f) is not equal to %.02f'%(k, e_val, a_val))
+                        else:
+                            self.logger.error('Error: %s - expected val(%.02f)/deviation(%.02f) is not equal to %.02f'%(k, e_val, e_offset, a_val))
+                else:
+                    if type(e_val) == int:
+                        if e_offset == 0:
+                            self.logger.info('Info: %s - expected val(%d) is equal to actual val(%d)'%(k, e_val, a_val))
+                        else:
+                            self.logger.info('Info: %s - expected val(%d)/deviation(%d) is equal to actual val(%d)'%(k, e_val, e_offset, a_val))
+                    elif type(e_val) == float:
+                        if e_offset == 0:
+                            self.logger.info('Info: %s - expected val(%.02f) is equal to actual val(%.02f)'%(k, e_val, a_val))
+                        else:
+                            self.logger.info('Info: %s - expected val(%.02f)/deviation(%.02f) is equal to actual val(%.02f)'%(k, e_val, e_offset, a_val))
+        return passed
+
+    def CheckHKPktVals(self):
+        """
+        Description:
+            Check the HK packets.
+        Outputs:
+            - bool: True if the test passed, False otherwise.
+        """
+        self.logger.info('------------------------------------')
+        self.logger.info('Checking HK Values')
+        self.logger.info('------------------------------------')
+        expected_results = self.expected_results['hk_vals']
+        # config the quabo
+        qc = QuaboConfig(self.ip)
+        # set the HK packet destination
+        qc.SetHkPacketDest()
+        # turn on the high voltage
+        qc.SetHv('on')
+        # wait for a few seconds to let the quabo warm up
+        time.sleep(5)
+        hk = HKRecv(self.ip)
+        hk.RecvData()
+        qc.SetHv('off')
+        qc.close()
+        hk.close()
+        hk.DumpData('reports/%s/quabo/hk_vals.npz'%self.uid)
+        hkpkt = hk.ParseData()
+        return self.CheckResults(expected_results, hkpkt[0])
+
+    def CheckHKTimestamp(self):
+        """
+        Description:
+            Check the HK timestamp.
+        """
+        self.logger.info('------------------------------------')
+        self.logger.info('Checking HK Timestamp Difference')
+        self.logger.info('------------------------------------')
+        if self.expected_results['hk_tdiff']['valid'] == False:
+            self.logger.info('HK timestamp difference will be skipped')
+            return True
+        e_val = self.expected_results['hk_tdiff']['val']
+        e_offset = self.expected_results['hk_tdiff']['deviation']
+        hk = HKRecv(self.ip)
+        hk.RecvData(2)
+        hk.DumpData('reports/%s/quabo/hk_timestamp.npz'%self.uid)
+        hkpkt = hk.ParseData()
+        hk.close()
+        # get the time difference
+        a_val = hkpkt[1]['timestamp'] - hkpkt[0]['timestamp']
+        if abs(e_val) - e_offset > abs(a_val) or abs(e_val) + e_offset < abs(a_val):
+            self.logger.error('Error: HK timestamp difference - Expected val(%.02f)/deviation(%.02f) is not equal to %.02f'%(e_val, e_offset, a_val))
+            return False
+        else:
+            self.logger.info('Info: HK timestamp difference - Expected val(%.02f)/deviation(%.02f) is equal to %.02f'%(e_val, e_offset, a_val))
+            return True
+    
+    def CheckMarocConfig(self):
+        """
+        Description:
+            Check the Quabo configuration.
+        Outputs:
+            - bool: True if the test passed, False otherwise.
+        """
+        self.logger.info('------------------------------------')
+        self.logger.info('Checking MAROC Chip Configuration')
+        self.logger.info('------------------------------------')
+        qc = QuaboConfig(self.ip)
+        # we have to set the MAROC params twice
+        r = qc.SetMarocParams()
+        r = qc.SetMarocParams()
+        qc.close()
+        if r:
+            self.logger.info('MAROC Chip is configured correctly')
+        else:
+            self.logger.error('MAROC Chip is not configured correctly')
+        return r
+
+    def CheckDestMac(self):
+        """
+        Description:
+            Check the destination MAC address for PH and Movie pachets.
+        """
+        self.logger.info('------------------------------------')
+        self.logger.info('Checking Destination MAC Address')
+        self.logger.info('------------------------------------')
+        if self.expected_results['dest_mac']['valid'] == False:
+            self.logger.info('Destination MAC address will be skipped')
+            return True
+        qc = QuaboConfig(self.ip)
+        # get the destination MAC address
+        macs = qc.SetDataPktDest()
+        qc.close()
+        quabo_config = Util.read_json('configs/quabo_config.json')
+        # get the destination MAC address for PH packets
+        ph_dest_ip = quabo_config['dest_ips']['PH']
+        self.logger.info('PH destination IP address: %s'%ph_dest_ip)
+        ph_mac_local = Util.get_mac_by_ip(ph_dest_ip)
+        self.logger.info('PH MAC address got on local machine: %s'%ph_mac_local)
+        ph_mac_quabo = ":".join("{:02x}".format(b) for b in macs['PH'])
+        self.logger.info('PH MAC address got on Quabo: %s'%ph_mac_quabo)
+        # get the destination MAC address for Movie packets
+        movie_dest_ip = quabo_config['dest_ips']['MOVIE']
+        self.logger.info('Movie destination IP address: %s'%movie_dest_ip)
+        movive_mac_local = Util.get_mac_by_ip(movie_dest_ip)
+        self.logger.info('Movie MAC address got on local machine: %s'%movive_mac_local)
+        movie_mac = ":".join("{:02x}".format(b) for b in macs['MOVIE'])
+        self.logger.info('Movie MAC address got on Quabo: %s'%movie_mac)
+        if ph_mac_local == ph_mac_quabo and movive_mac_local == movie_mac:
+            self.logger.info('Destination MAC address is correct')
+            return True
+        else:
+            self.logger.error('Destination MAC address is not correct')
+            return False
+
+    def CheckWR(self):
+        """
+        Description:
+            Check the White Rabbit timing.
+        """
+    
+
+class SiPMSimTest(QuaboTest):
+    """
+    Description:
+        The SiPMSimTest class is used to test the pixel.
+    """
+    PIXEL_PER_CONNECTOR = 32
+    def __init__(self, boardver='bga', connector='J1A', ip_file='configs/quabo_ip.json', expected_results_file='configs/expected_results.json'):
+        """
+        Description:
+            The constructor of SiPMSimTest class.
+        Inputs:
+            - connector(str): the connector of the pixel.
+        """
+        super().__init__(ip_file = ip_file, expected_results_file = expected_results_file)
+        self.connector = connector
+        self.boardver = boardver
+        # create logger
+        self.logger = Util.create_logger('reports/%s/reports_sipm_%s.log'%(self.uid, self.connector), mode='w', tag='SiPMSimTest')
+        self.logger.info('Quabo UID - %s'%self.uid)
+    
+    def _CheckPatternMatch(self, d, p):
+        """
+        Description:
+            Check if the data and pattern match to each other.
+        Inputs:
+            - d(np.darray): the data to check.
+            - p(np.darray): the pattern to check.
+        Outputs:
+            - bool: True if the data and pattern match, False otherwise.
+        """
+        match = False
+        for i in range(len(p)):
+            if p[i] == d[0]:
+                for j in range(len(d)):
+                    k = (i + j)%len(p)
+                    if p[k] != d[j]:
+                        self.logger.error('Pattern not matched: data[%d](%d) != pattern[%d](%d)'%(k, j, p[k], d[j]))
+                        break
+                    elif j == len(d) - 1:
+                        match = True
+        return match
+
+    def CheckPHPeaks(self):
+        """
+        Description:
+            Check how many peaks are in the PH data.
+        """
+        self.logger.info('------------------------------------')
+        self.logger.info('Checking PH Peaks')
+        self.logger.info('------------------------------------')
+        if self.expected_results['ph_npeak']['valid'] == False:
+            self.logger.info('PH peaks will be skipped')
+            return True
+        e_val = self.expected_results['ph_npeak']['val']
+        e_offset = self.expected_results['ph_npeak']['deviation']
+        # config the quabo
+        qc = QuaboConfig(self.ip)
+        # set the PH packet destination
+        qc.SetDataPktDest()
+        # turn on the high voltage
+        qc.SetHv('on')
+        # configure the MAROC parameters
+        qc.SetMarocParams()
+        # set the PH packet mode
+        params = DAQ_PARAMS(do_image=False, image_us=1000, image_8bit=False, do_ph=True,bl_subtract=True)
+        qc.DaqParamsConfig(params)
+        # wait for a few seconds to let the quabo warm up
+        time.sleep(2)
+        ph = DataRecv(self.ip)
+        ph.RecvData(self.autotest_config['NPhPeaks'])
+        # turn off the high voltage
+        qc.SetHv('off')
+        # turn off the PH packet mode
+        params = DAQ_PARAMS(do_image=False, image_us=1000, image_8bit=False, do_ph=False,bl_subtract=True)
+        qc.DaqParamsConfig(params)
+        qc.close()
+        ph.close()
+        ph.DumpData('reports/%s/sipmsim/ph_peaks.npz'%self.uid)
+        # parse the PH data
+        phpkt = ph.ParseData()
+        # check the PH data
+        npeaks = []
+        for d in phpkt:
+            n = 0
+            mean = np.mean(d['data'])
+            for i in range(len(d['data'])):
+                if d['data'][i] > self.autotest_config['PHThreshold'] + mean:
+                    n += 1
+            npeaks.append(n)
+        npeaks = np.array(npeaks)
+        a_val = np.mean(npeaks)
+        if a_val != e_val:
+            self.logger.error('Error: PH peaks - Expected val(%d) is not equal to %.02f'%(e_val, a_val))
+            return False
+        else:
+            self.logger.info('Info: PH peaks - Expected val(%d) is equal to %.02f'%(e_val, a_val))
+            return True
+        
+    def CheckPHdata(self):
+        """
+        Description:
+            Check the PH data.
+        Outputs:
+            - bool: True if the test passed, False otherwise.
+        """
+        self.logger.info('------------------------------------')
+        self.logger.info('Checking PH Data')
+        self.logger.info('------------------------------------')
+        expected_results = self.expected_results['ph_data']
+        # config the quabo
+        qc = QuaboConfig(self.ip)
+        # set the PH packet destination
+        qc.SetDataPktDest()
+        # turn on the high voltage
+        qc.SetHv('on')
+        # configure the MAROC parameters
+        qc.SetMarocParams()
+        # set the PH packet mode
+        params = DAQ_PARAMS(do_image=False, image_us=1000, image_8bit=False, do_ph=True,bl_subtract=True)
+        qc.DaqParamsConfig(params)
+        # wait for a few seconds to let the quabo warm up
+        time.sleep(2)
+        ph = DataRecv(self.ip)
+        ph.RecvData(self.autotest_config['NPhPkt'])
+        # turn off the high voltage
+        qc.SetHv('off')
+        # turn off the PH packet mode
+        params = DAQ_PARAMS(do_image=False, image_us=1000, image_8bit=False, do_ph=False,bl_subtract=True)
+        qc.DaqParamsConfig(params)
+        qc.close()
+        ph.close()
+        ph.DumpData('reports/%s/sipmsim/ph_data.npz'%self.uid)
+        phpkt = ph.ParseData()
+        # check the PH data
+        peaks = []
+        for d in phpkt:
+            peaks.append(max(d['data']))
+        peaks = np.array(peaks)
+        peaks_mean = np.mean(peaks)
+        peaks_std = np.std(peaks)
+        peaks_max = np.max(peaks)
+        peaks_min = np.min(peaks)
+        actual_vals = {}
+        actual_vals['mean'] = peaks_mean
+        actual_vals['std'] = peaks_std
+        actual_vals['max'] = peaks_max
+        actual_vals['min'] = peaks_min
+        # check the results
+        return self.CheckResults(expected_results, actual_vals)
+
+    def CheckPHTimestamp(self):
+        """
+        Description:
+            Check the PH timestamp.
+        Outputs:
+            - bool: True if the test passed, False otherwise.
+        """
+        self.logger.info('------------------------------------')
+        self.logger.info('Checking PH Timestamp Difference')
+        self.logger.info('------------------------------------')
+        if self.expected_results['ph_pulse_rate']['valid'] == False:
+            self.logger.info('PH timestamp difference will be skipped')
+            return True
+        e_val = self.expected_results['ph_pulse_rate']['val']
+        e_offset = self.expected_results['ph_pulse_rate']['deviation']
+        # config the quabo
+        qc = QuaboConfig(self.ip)
+        # set the PH packet destination
+        qc.SetDataPktDest()
+        # turn on the high voltage
+        qc.SetHv('on')
+        # configure the MAROC parameters
+        qc.SetMarocParams()
+        # set the PH packet mode
+        params = DAQ_PARAMS(do_image=False, image_us=1000, image_8bit=False, do_ph=True,bl_subtract=True)
+        qc.DaqParamsConfig(params)
+        # wait for a few seconds to let the quabo warm up
+        time.sleep(2)
+        ph = DataRecv(self.ip)
+        ph.RecvData(self.autotest_config['NPhPkt'])
+        # turn off the high voltage
+        qc.SetHv('off')
+        # turn off the PH packet mode
+        params = DAQ_PARAMS(do_image=False, image_us=1000, image_8bit=False, do_ph=False,bl_subtract=True)
+        qc.DaqParamsConfig(params)
+        qc.close()
+        ph.close()
+        ph.DumpData('reports/%s/sipmsim/ph_timestamp.npz'%self.uid)
+        phpkt = ph.ParseData()
+        # get the timestamp
+        timestamps = []
+        for d in phpkt:
+            timestamps.append(d['timestamp'])
+        timestamps = np.array(timestamps, dtype=np.float64)
+        timestamps_diff = np.diff(timestamps)
+        a_val = 1/np.mean(timestamps_diff)
+        if abs(e_val) - e_offset > abs(a_val) or abs(e_val) + e_offset < abs(a_val):
+            self.logger.error('Error: PH timestamp difference - Expected val(%.02f)/deviation(%.02f) is not equal to %.02f'%(e_val, e_offset, a_val))
+            return False
+        else:
+            self.logger.info('Info: PH timestamp difference - Expected val(%.02f)/deviation(%.02f) is equal to %.02f'%(e_val, e_offset, a_val))
+            return True
+
+    def CheckPHPattern(self):
+        """
+        Description:
+            Check the PH data pattern.
+        Outputs:
+            - bool: True if the test passed, False otherwise.
+        """
+        self.logger.info('------------------------------------')
+        self.logger.info('Checking PH Data Pattern')
+        self.logger.info('------------------------------------')
+        self.logger.info('Board Version - %s'%self.boardver)
+        self.logger.info('Connector - %s'%self.connector)
+        if self.expected_results['ph_pattern']['valid'] == False:
+            self.logger.info('PH pattern will be skipped')
+            return True
+        # get expected pattern
+        e_pattern = self.expected_results['ph_pattern'][self.boardver][self.connector]
+        # configure the quabo
+        qc = QuaboConfig(self.ip)
+        # set the PH packet destination
+        qc.SetHkPacketDest()
+        mac = qc.SetDataPktDest()
+        # configure maroc chip
+        qc.SetMarocParams()
+        # set the PH packet mode
+        params = DAQ_PARAMS(do_image=False, image_us=1000, image_8bit=False, do_ph=True,bl_subtract=True)
+        qc.DaqParamsConfig(params)
+        # wait for a few seconds to let the quabo warm up
+        time.sleep(2)
+        # turn on the high voltage
+        qc.SetHv('on')
+        # get data
+        ph = DataRecv(self.ip)
+        ph.RecvData(self.autotest_config['NPhPkt'])
+        qc.SetHv('off')
+        # turn off the PH packet mode
+        params = DAQ_PARAMS(do_image=False, image_us=1000, image_8bit=False, do_ph=False,bl_subtract=True)
+        qc.DaqParamsConfig(params)
+        qc.close()
+        ph.close()
+        ph.DumpData('reports/%s/sipmsim/ph_pattern_%s.npz'%(self.uid, self.connector))
+        # parse the data
+        phpkt = ph.ParseData()
+        # get the pattern
+        ph_pattern = []
+        for d in phpkt:
+            ph_pattern.append(np.argmax(d['data']))
+        ph_pattern = np.array(ph_pattern)
+        # check the pattern
+        # We will check it for 10 times
+        # We get 10 * 64 samples for test
+        # The numbers here are a kind of random numbers.
+        # if evertything is ok, we will get the same pattern.
+        # TODO: add more flexible way to check the pattern
+        # TODO: we may not want to use the random numbers here
+        NCheck = 10
+        NMactched = 0
+        for i in range(NCheck):
+            a_pattern = ph_pattern[i*68 + 16:i*68 + 16 + 64]
+            match = self._CheckPatternMatch(ph_pattern, e_pattern)
+            if match:
+                self.logger.info('Info: PH pattern match in %02d round check.'%i)
+                NMactched += 1
+            else:
+                self.logger.error('Error: PH pattern not match in %02d round check.'%i)
+        if NMactched == NCheck:
+            self.logger.info('Info: PH pattern check is successfully.')
+            return True
+        else:
+            self.logger.error('Error: PH pattern check failed.')
+            return False
