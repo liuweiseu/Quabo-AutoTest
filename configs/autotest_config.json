@@ -1,9 +1,9 @@
 {
     "BoardRev": "bga",
-    "SiPMsimulator": "J1A",
+    "SiPMsimulator": "J1B",
     "NPhPkt": 1000,
     "NPhPeaks": 32,
-    "PHThreshold": 500,
+    "PHThreshold": 300,
     "NMoviePkt": 1000,
     "IntegrationTime": 5000
 }

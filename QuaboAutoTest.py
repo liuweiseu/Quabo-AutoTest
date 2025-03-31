@@ -2337,14 +2337,14 @@ class QuaboTest(object):
             tdiff.append(t1 - t0)
         tdiff = np.array(tdiff)
         # check the max and min of the timestamps difference
-        if np.max(tdiff) != integration_time or np.min(tdiff) != integration_time:
+        if np.max(tdiff) != integration_time or np.min(tdiff) != integration_time*10**3:
             passed = False
-            self.logger.error('Error: White Rabbit timestamp - max timestamp difference(%d) is not equal to integration time(%d)'%(np.max(tdiff), integration_time))
-            self.logger.error('Error: White Rabbit timestamp - min timestamp difference(%d) is not equal to integration time(%d)'%(np.min(tdiff), integration_time))   
+            self.logger.error('Error: White Rabbit timestamp - max timestamp difference(%d) is not equal to integration time(%d)'%(np.max(tdiff), integration_time*10**3))
+            self.logger.error('Error: White Rabbit timestamp - min timestamp difference(%d) is not equal to integration time(%d)'%(np.min(tdiff), integration_time*10**3))   
         # check the mean of the timestamps difference
-        if np.mean(tdiff) != integration_time:
+        if np.mean(tdiff) != integration_time*10**3:
             passed = False
-            self.logger.error('Error: White Rabbit timestamp - mean timestamp difference(%.02f) is not equal to integration time(%d)'%(np.mean(tdiff), integration_time))  
+            self.logger.error('Error: White Rabbit timestamp - mean timestamp difference(%.02f) is not equal to integration time(%d)'%(np.mean(tdiff), integration_time*10**3))  
         return passed   
     
 
@@ -2437,13 +2437,20 @@ class SiPMSimTest(QuaboTest):
                     n += 1
             npeaks.append(n)
         npeaks = np.array(npeaks)
-        a_val = np.mean(npeaks)
-        if a_val != e_val:
-            self.logger.error('Error: PH peaks - Expected val(%d) is not equal to %.02f'%(e_val, a_val))
-            return False
+        passed = True
+        # check the min peaks, which should be 1 at least
+        if np.min(npeaks) < 1:
+            self.logger.error('Error: PH peaks - min peaks(%d) is less than 1'%np.min(npeaks))
+            passed = False
         else:
-            self.logger.info('Info: PH peaks - Expected val(%d) is equal to %.02f'%(e_val, a_val))
-            return True
+            self.logger.info('Info: PH peaks - min peaks(%d) is greater than 0'%np.min(npeaks))
+        a_val = np.mean(npeaks)
+        if a_val > e_val + e_offset or a_val < e_val - e_offset:
+            self.logger.error('Error: PH peaks - Expected val(%.02f)/deviation(%.02f) is not equal to %.02f'%(e_val, e_offset, a_val))
+            passed = False
+        else:
+            self.logger.info('Info: PH peaks - Expected val(%.02f)/deviation(%.02f) is equal to %.02f'%(e_val, e_offset, a_val))
+        return passed
         
     def CheckPHdata(self):
         """

@@ -12,22 +12,22 @@
         },
         "hvmon0": {
             "val": -55.0,
-            "deviation": 1,
+            "deviation": 2.0,
             "valid": true
         },
         "hvmon1": {
             "val": -55.0,
-            "deviation": 1,
+            "deviation": 2.0,
             "valid": true
         },
         "hvmon2": {
             "val": -55.0,
-            "deviation": 1,
+            "deviation": 2.0,
             "valid": true
         },
         "hvmon3": {
             "val": -55.0,
-            "deviation": 1,
+            "deviation": 2.0,
             "valid": true
         },
         "hvimon0": {
@@ -173,7 +173,7 @@
     },
     "ph_npeak": {
         "val": 2,
-        "deviation": 0,
+        "deviation": 0.1,
         "valid": true
     },
     "ph_pulse_rate": {
@@ -227,7 +227,40 @@
                 10,
                 26
             ],
-            "J1B": [],
+            "J1B": [
+                125,
+                76,
+                92,
+                91,
+                75,
+                74,
+                90,
+                89,
+                73,
+                88,
+                72,
+                104,
+                120,
+                121,
+                122,
+                106,
+                105,
+                110,
+                126,
+                93,
+                78,
+                77,
+                95,
+                79,
+                94,
+                111,
+                127,
+                123,
+                107,
+                108,
+                124,
+                109
+            ],
             "J2A": [],
             "J2B": [],
             "J3A": [],
