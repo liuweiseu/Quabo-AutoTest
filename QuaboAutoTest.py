@@ -459,6 +459,54 @@ class Util(object):
                             mac_address = addresses[netifaces.AF_LINK][0]['addr']
                             return mac_address
         return None
+
+    @staticmethod
+    def ParseSciData(pkt, timestamps, mode='ph'):
+        """
+        Description:
+            parse the data received from the quabo.
+        Inputs:
+            - data(bytearray): the data received from the quabo.
+        """
+        parsed_data = []
+        for i in range(len(pkt)):
+            if pkt[i] is None:
+                continue
+            data = pkt[i]
+            timestamp = timestamps[i]
+            # parse the data here
+            sci_data = {}
+            sci_data['timestamp'] = timestamp
+            for k,v in DaqPktDef.items():
+                # deal with some special cases
+                if k == 'boardloc':
+                    r = struct.unpack('<H', data[0:2])[0]
+                    sci_data[k] = '192.168.%d.%d'%(r>>8, r&0xff)
+                    continue
+                if k == 'data':
+                    offset = v[mode]['offset']
+                    length = v[mode]['length']
+                    flag = DType[v[mode]['type']]['flag']
+                    size = DType[v[mode]['type']]['size']
+                    d = data[offset:offset+length]
+                    dtype = '<%d%s'%(length/size, flag)
+                    r = struct.unpack(dtype, d)
+                    if mode == 'ph':
+                        sci_data[k] = np.array(r, dtype=np.short)
+                    elif mode == 'movie-16bit':
+                        sci_data[k] = np.array(r, dtype=np.ushort)
+                    elif mode == 'movie-8bit':
+                        sci_data[k] = np.array(r, dtype=np.ubyte) 
+                    continue
+                offset = v['offset']
+                length = v['length']
+                flag = DType[v['type']]['flag']
+                size = DType[v['type']]['size']
+                d = data[offset:offset+length]
+                dtype = '<%d%s'%(length/size, flag)
+                sci_data[k] = struct.unpack(dtype, d)[0]
+            parsed_data.append(sci_data)
+        return np.array(parsed_data)
     
 class tftpw(object):
     """
@@ -2210,7 +2258,6 @@ class SiPMSimTest(QuaboTest):
                 for j in range(len(d)):
                     k = (i + j)%len(p)
                     if p[k] != d[j]:
-                        self.logger.error('Pattern not matched: data[%d](%d) != pattern[%d](%d)'%(k, j, p[k], d[j]))
                         break
                     elif j == len(d) - 1:
                         match = True
@@ -2394,6 +2441,8 @@ class SiPMSimTest(QuaboTest):
             return True
         # get expected pattern
         e_pattern = self.expected_results['ph_pattern'][self.boardver][self.connector]
+        # each pulse will generate 2 ph events
+        e_pattern = np.repeat(e_pattern, 2)
         # configure the quabo
         qc = QuaboConfig(self.ip)
         # set the PH packet destination
@@ -2436,7 +2485,7 @@ class SiPMSimTest(QuaboTest):
         NMactched = 0
         for i in range(NCheck):
             a_pattern = ph_pattern[i*68 + 16:i*68 + 16 + 64]
-            match = self._CheckPatternMatch(ph_pattern, e_pattern)
+            match = self._CheckPatternMatch(a_pattern, e_pattern)
             if match:
                 self.logger.info('Info: PH pattern match in %02d round check.'%i)
                 NMactched += 1
@@ -2446,5 +2495,7 @@ class SiPMSimTest(QuaboTest):
             self.logger.info('Info: PH pattern check is successfully.')
             return True
         else:
+            self.logger.debug('Expected Pattern: \n%s'%e_pattern)
+            self.logger.debug('Actual Pattern: \n%s'%a_pattern)
             self.logger.error('Error: PH pattern check failed.')
             return False
