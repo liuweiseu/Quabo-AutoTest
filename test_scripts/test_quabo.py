@@ -4,7 +4,7 @@ import pytest
 autotest = QuaboTest('configs/quabo_ip.json')
 
 @pytest.mark.all
-@pytest.mark.hk
+@pytest.mark.hk_vals
 def test_hk_vals():
     """
     Description: 
@@ -14,7 +14,7 @@ def test_hk_vals():
     assert result == True
 
 @pytest.mark.all
-@pytest.mark.hk
+@pytest.mark.hk_time
 def test_hk_timestamp():
     """"
     Description: 
@@ -33,5 +33,14 @@ def test_maroc_config():
     result = autotest.CheckMarocConfig()  
     assert result == True
 
+@pytest.mark.all
+@pytest.mark.wr
+def test_wr():
+    """
+    Description:
+        Check the WR timg.
+    """
+    result = autotest.CheckWRTiming()  
+    assert result == True
 
 

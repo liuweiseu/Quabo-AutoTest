@@ -4,5 +4,6 @@
     "NPhPkt": 1000,
     "NPhPeaks": 32,
     "PHThreshold": 500,
-    "NMoivePkt": 1000
+    "NMoviePkt": 1000,
+    "IntegrationTime": 5000
 }

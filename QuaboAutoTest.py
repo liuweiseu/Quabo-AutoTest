@@ -2281,11 +2281,63 @@ class QuaboTest(object):
             self.logger.error('Destination MAC address is not correct')
             return False
 
-    def CheckWR(self):
+    def CheckWRTiming(self):
         """
         Description:
             Check the White Rabbit timing.
+            We will check WR by checking the timestamps in the Movie packets.
         """
+        self.logger.info('------------------------------------')
+        self.logger.info('Checking White Rabbit Timing')
+        self.logger.info('------------------------------------')
+        if self.expected_results['wr']['valid'] == False:
+            self.logger.info('White Rabbit timing will be skipped')
+            return True
+        integration_time = self.autotest_config['IntegrationTime']
+        # config the quabo
+        qc = QuaboConfig(self.ip)
+        # set the Movie packet destination
+        qc.SetDataPktDest()
+        # set the Movie packet mode
+        params = DAQ_PARAMS(do_image=True, image_us=integration_time
+        , image_8bit=False, do_ph=False,bl_subtract=True)
+        qc.DaqParamsConfig(params)
+        # wait for a few seconds to let the quabo warm up
+        time.sleep(2)
+        # receive the data
+        qcd = DataRecv(self.ip)
+        qcd.RecvData(self.autotest_config['NMoviePkt'])
+        # turn off the Movie packet mode
+        params = DAQ_PARAMS(do_image=False, image_us=integration_time
+        , image_8bit=False, do_ph=False,bl_subtract=True)
+        qc.DaqParamsConfig(params)
+        qc.close()
+        qcd.close()
+        qcd.DumpData('reports/%s/quabo/wr_timing.npz'%self.uid)
+        # parse the data
+        qcdpkt = qcd.ParseData(mode='movie-16bit')
+        # check the timestamps
+        timestamps = []
+        for d in qcdpkt:
+            timestamps.append(d['nanosec'])
+        timestamps = np.array(timestamps)
+        passed = True
+        # check the max timestamps
+        max_timestamps = np.max(timestamps)
+        if max_timestamps > 10**9:
+            passed = False
+            self.logger.error('Error: White Rabbit timestamp - max timestamp(%d) is greater than 1 second'%max_timestamps)
+        # check the timestamps difference
+        tdiff = np.diff(timestamps)
+        if np.max(tdiff) != integration_time or np.min(tdiff) != integration_time:
+            passed = False
+            self.logger.error('Error: White Rabbit timestamp - max timestamp difference(%d) is not equal to integration time(%d)'%(np.max(tdiff), integration_time))
+            self.logger.error('Error: White Rabbit timestamp - min timestamp difference(%d) is not equal to integration time(%d)'%(np.min(tdiff), integration_time))   
+        # check the mean of the timestamps difference
+        if np.mean(tdiff) != integration_time:
+            passed = False
+            self.logger.error('Error: White Rabbit timestamp - mean timestamp difference(%.02f) is not equal to integration time(%d)'%(np.mean(tdiff), integration_time))  
+        return passed   
     
 
 class SiPMSimTest(QuaboTest):
