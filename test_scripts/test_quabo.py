@@ -34,7 +34,7 @@ def test_maroc_config():
     assert result == True
 
 @pytest.mark.all
-@pytest.mark.wr
+@pytest.mark.wr_timing
 def test_wr():
     """
     Description:
