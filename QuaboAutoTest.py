@@ -1428,9 +1428,13 @@ class QuaboConfig(QuaboSock):
         """
         self.logger.debug('set MAROC parameters')
         cmd = bytearray(492)
-        maroc_config = self.quabo_config['maroc']
         self._make_maroc_cmd(cmd, echo=echo)
         self.send(cmd)
+        reply = self.recv(492)
+        # let's send the cmd twice every time
+        # the reason is that the first time the maroc chip is not configured, 
+        # so the read back register values are not correct.
+        self.send(cmd) 
         if echo:
             reply = self.recv(492)
             count = len(reply)
@@ -2235,7 +2239,6 @@ class QuaboTest(object):
         self.logger.info('------------------------------------')
         qc = QuaboConfig(self.ip)
         # we have to set the MAROC params twice
-        r = qc.SetMarocParams()
         r = qc.SetMarocParams()
         qc.close()
         if r:

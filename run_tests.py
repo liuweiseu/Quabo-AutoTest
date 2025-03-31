@@ -13,7 +13,7 @@ if __name__ == "__main__":
                         help='target device(quabo or sipmsim). Default: quabo')
     parser.add_argument('-m', '--mark', dest='mark', type=str, 
                         default='all',
-                        choices=['all', 'hk_vals', 'hk_time', 'maroc', 'mac', 'wr_timing',
+                        choices=['all', 'hk_vals', 'hk_time', 'maroc_config', 'mac', 'wr_timing',
                                  'ph', 'ph_data', 'ph_timing', 'ph_peaks', 'ph_pattern'],
                         help='select the test marker.' 
                          'Default: all')

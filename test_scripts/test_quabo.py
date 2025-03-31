@@ -24,8 +24,8 @@ def test_hk_time():
     assert result == True
 
 @pytest.mark.all
-@pytest.mark.maroc
-def test_maroc():
+@pytest.mark.maroc_config
+def test_maroc_config():
     """"
     Description: 
         Check the MAROC config
