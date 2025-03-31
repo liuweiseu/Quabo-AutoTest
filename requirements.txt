@@ -1,0 +1,3 @@
+tftpy
+ping3
+netifaces
