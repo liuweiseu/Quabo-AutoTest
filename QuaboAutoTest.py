@@ -1085,10 +1085,13 @@ class QuaboConfig(QuaboSock):
         self.flush_rx_buf()
         self.send(cmd)
         reply = self.recv(12)
+        if reply is None:
+            self.logger.error('Error: no MAC address replied from quabo')
+            return None
         count = len(reply)
         if count != 12:
             self.logger.error('Error: reply length is %d, but should be 12'%count)
-            return False
+            return None
         else:
             mac_addr = {}
             mac_addr['PH'] = struct.unpack('6B',reply[0:6])
@@ -1437,6 +1440,9 @@ class QuaboConfig(QuaboSock):
         self.send(cmd) 
         if echo:
             reply = self.recv(492)
+            if reply == None:
+                self.logger.error('Error: reply is None')
+                return False
             count = len(reply)
             if count != 492:
                 self.logger.error('Error: reply length is %d, but should be 492'%count)
@@ -1898,6 +1904,9 @@ class HKRecv(QuaboSock):
         Outputs:
             - parsed_data(list): the parsed housekeeping data.
         """
+        if self.data is None:
+            self.logger.error('Error: Failed to parse HK data, which is None')
+            return None
         parsed_data = np.zeros(len(self.data), dtype=object)
         self.logger.debug('parse HK data')
         for i in range(len(self.data)):
@@ -2038,6 +2047,9 @@ class DataRecv(QuaboSock):
             - data(bytearray): the data received from the quabo.
         """
         self.logger.debug('parse science data')
+        if self.data is None:
+            self.logger.error('Error: Failed to parse science data, which is None')
+            return None
         parsed_data = []
         for i in range(len(self.data)):
             if self.data[i] is None:
@@ -2196,8 +2208,13 @@ class QuaboTest(object):
         qc.SetHv('off')
         qc.close()
         hk.close()
-        hk.DumpData('reports/%s/quabo/hk_vals.npz'%self.uid)
         hkpkt = hk.ParseData()
+        if hkpkt is None:
+            self.logger.error('Error: Failed to parse HK data, which is None')
+            self.logger.error('Error: HK vals check failed')
+            return False
+        # dump the data
+        hk.DumpData('reports/%s/quabo/hk_vals.npz'%self.uid)
         return self.CheckResults(expected_results, hkpkt[0])
 
     def CheckHKTimestamp(self):
@@ -2215,8 +2232,13 @@ class QuaboTest(object):
         e_offset = self.expected_results['hk_interval']['deviation']
         hk = HKRecv(self.ip)
         hk.RecvData(2)
-        hk.DumpData('reports/%s/quabo/hk_timestamp.npz'%self.uid)
         hkpkt = hk.ParseData()
+        if hkpkt is None:
+            self.logger.error('Error: Failed to parse HK data, which is None')
+            self.logger.error('Error: HK time check failed')
+            return False
+        # dump the data
+        hk.DumpData('reports/%s/quabo/hk_timestamp.npz'%self.uid)
         hk.close()
         # get the time difference
         a_val = hkpkt[1]['timestamp'] - hkpkt[0]['timestamp']
@@ -2261,6 +2283,10 @@ class QuaboTest(object):
         qc = QuaboConfig(self.ip)
         # get the destination MAC address
         macs = qc.SetDataPktDest()
+        if macs is None:
+            self.logger.error('Error: no MAC address received from the quabo')
+            self.logger.error('Error: Destination MAC address check failed')
+            return False
         qc.close()
         quabo_config = Util.read_json('configs/quabo_config.json')
         # get the destination MAC address for PH packets
@@ -2300,7 +2326,11 @@ class QuaboTest(object):
         # config the quabo
         qc = QuaboConfig(self.ip)
         # set the Movie packet destination
-        qc.SetDataPktDest()
+        macs = qc.SetDataPktDest()
+        if macs is None:
+            self.logger.error('Error: no MAC address received from the quabo')
+            self.logger.error('Error: White Rabbit timing check failed')
+            return False
         # set the Movie packet mode
         params = DAQ_PARAMS(do_image=True, image_us=integration_time
         , image_8bit=False, do_ph=False,bl_subtract=True)
@@ -2310,15 +2340,23 @@ class QuaboTest(object):
         # receive the data
         qcd = DataRecv(self.ip)
         qcd.RecvData(self.autotest_config['NMoviePkt'])
+        if qcd.data is None:
+            self.logger.error('Error: No data received from the quabo')
+            return False
         # turn off the Movie packet mode
         params = DAQ_PARAMS(do_image=False, image_us=integration_time
         , image_8bit=False, do_ph=False,bl_subtract=True)
         qc.DaqParamsConfig(params)
         qc.close()
         qcd.close()
-        qcd.DumpData('reports/%s/quabo/wr_timing.npz'%self.uid)
         # parse the data
         qcdpkt = qcd.ParseData(mode='movie-16bit')
+        if qcdpkt is None:
+            self.logger.error('Error: Failed to parse Movie data, which is None')
+            self.logger.error('Error: White Rabbit timing check failed')
+            return False
+        # dump the data
+        qcd.DumpData('reports/%s/quabo/wr_timing.npz'%self.uid)
         # check the timestamps
         timestamps = []
         for d in qcdpkt:
@@ -2417,7 +2455,11 @@ class SiPMSimTest(QuaboTest):
         # config the quabo
         qc = QuaboConfig(self.ip)
         # set the PH packet destination
-        qc.SetDataPktDest()
+        macs = qc.SetDataPktDest()
+        if macs is None:
+            self.logger.error('Error: no MAC address received from the quabo')
+            self.logger.error('Error: PH peaks check failed')
+            return False
         # turn on the high voltage
         qc.SetHv('on')
         # configure the MAROC parameters
@@ -2436,9 +2478,14 @@ class SiPMSimTest(QuaboTest):
         qc.DaqParamsConfig(params)
         qc.close()
         ph.close()
-        ph.DumpData('reports/%s/sipmsim/ph_peaks.npz'%self.uid)
         # parse the PH data
         phpkt = ph.ParseData()
+        if phpkt is None:
+            self.logger.error('Error: Failed to parse PH data, which is None')
+            self.logger.error('Error: PH peaks check failed')
+            return False
+        # dump the data
+        ph.DumpData('reports/%s/sipmsim/ph_peaks.npz'%self.uid)
         # check the PH data
         npeaks = []
         for d in phpkt:
@@ -2478,7 +2525,11 @@ class SiPMSimTest(QuaboTest):
         # config the quabo
         qc = QuaboConfig(self.ip)
         # set the PH packet destination
-        qc.SetDataPktDest()
+        macs = qc.SetDataPktDest()
+        if macs is None:
+            self.logger.error('Error: no MAC address received from the quabo')
+            self.logger.error('Error: PH data check failed')
+            return False
         # turn on the high voltage
         qc.SetHv('on')
         # configure the MAROC parameters
@@ -2497,8 +2548,13 @@ class SiPMSimTest(QuaboTest):
         qc.DaqParamsConfig(params)
         qc.close()
         ph.close()
-        ph.DumpData('reports/%s/sipmsim/ph_data.npz'%self.uid)
         phpkt = ph.ParseData()
+        if phpkt is None:
+            self.logger.error('Error: Failed to parse PH data, which is None')
+            self.logger.error('Error: PH data check failed')
+            return False
+        # dump the data
+        ph.DumpData('reports/%s/sipmsim/ph_data.npz'%self.uid)
         # check the PH data
         peaks = []
         for d in phpkt:
@@ -2534,7 +2590,11 @@ class SiPMSimTest(QuaboTest):
         # config the quabo
         qc = QuaboConfig(self.ip)
         # set the PH packet destination
-        qc.SetDataPktDest()
+        macs = qc.SetDataPktDest()
+        if macs is None:
+            self.logger.error('Error: no MAC address received from the quabo')
+            self.logger.error('Error: PH timing check failed')
+            return False
         # turn on the high voltage
         qc.SetHv('on')
         # configure the MAROC parameters
@@ -2553,8 +2613,13 @@ class SiPMSimTest(QuaboTest):
         qc.DaqParamsConfig(params)
         qc.close()
         ph.close()
-        ph.DumpData('reports/%s/sipmsim/ph_timestamp.npz'%self.uid)
         phpkt = ph.ParseData()
+        if phpkt is None:
+            self.logger.error('Error: Failed to parse PH data, which is None')
+            self.logger.error('Error: PH timing check failed')
+            return False
+        # dump the data
+        ph.DumpData('reports/%s/sipmsim/ph_timestamp.npz'%self.uid)
         # get the timestamp
         timestamps = []
         for d in phpkt:
@@ -2592,7 +2657,11 @@ class SiPMSimTest(QuaboTest):
         qc = QuaboConfig(self.ip)
         # set the PH packet destination
         qc.SetHkPacketDest()
-        mac = qc.SetDataPktDest()
+        macs = qc.SetDataPktDest()
+        if macs is None:
+            self.logger.error('Error: no MAC address received from the quabo')
+            self.logger.error('Error: PH pattern check failed')
+            return False
         # configure maroc chip
         qc.SetMarocParams()
         # set the PH packet mode
@@ -2611,9 +2680,14 @@ class SiPMSimTest(QuaboTest):
         qc.DaqParamsConfig(params)
         qc.close()
         ph.close()
-        ph.DumpData('reports/%s/sipmsim/ph_pattern_%s.npz'%(self.uid, self.connector))
         # parse the data
         phpkt = ph.ParseData()
+        if phpkt is None:
+            self.logger.error('Error: Failed to parse PH data, which is None')
+            self.logger.error('Error: PH pattern check failed')
+            return False
+        # dump the data
+        ph.DumpData('reports/%s/sipmsim/ph_pattern_%s.npz'%(self.uid, self.connector))
         # get the pattern
         ph_pattern = []
         for d in phpkt:
