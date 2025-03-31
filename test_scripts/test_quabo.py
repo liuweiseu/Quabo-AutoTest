@@ -15,7 +15,7 @@ def test_hk_vals():
 
 @pytest.mark.all
 @pytest.mark.hk_time
-def test_hk_timestamp():
+def test_hk_time():
     """"
     Description: 
         Check the HK timestamp"
@@ -25,7 +25,7 @@ def test_hk_timestamp():
 
 @pytest.mark.all
 @pytest.mark.maroc
-def test_maroc_config():
+def test_maroc():
     """"
     Description: 
         Check the MAROC config
@@ -35,7 +35,7 @@ def test_maroc_config():
 
 @pytest.mark.all
 @pytest.mark.wr_timing
-def test_wr():
+def test_wr_timing():
     """
     Description:
         Check the WR timg.

@@ -9,44 +9,47 @@ if __name__ == "__main__":
     parser.add_argument('--ip-config', dest='ip_config', type=str, 
                         default='configs/quabo_ip.json',
                         help='IP config file. Default: configs/quabo_ip.json')
+    parser.add_argument('-t', '--target', dest='target', type=str, default='quabo',
+                        help='target device(quabo or sipmsim). Default: quabo')
     parser.add_argument('-m', '--mark', dest='mark', type=str, 
                         default='all',
                         choices=['all', 'hk_vals', 'hk_time', 'maroc', 'mac', 'wr_timing',
                                  'ph', 'ph_data', 'ph_timing', 'ph_peaks', 'ph_pattern'],
                         help='select the test marker.' 
                          'Default: all')
-    parser.add_argument('-r', '--reboot', dest='reboot', action='store_true',
-                        default=False,
-                        help='reboot the Quabo.')
-    parser.add_argument('-t', '--target', dest='target', type=str, default='quabo',
-                        help='target device(quabo or sipmsim). Default: quabo')
-    parser.add_argument('-c', '--connector', dest='connector', type=str, 
-                        choices=['J1A', 'J1B', 'J2A', 'J2B', 'J3A', 'J3B', 'J4A', 'J4B'],
-                        default=None,
-                        help='SiPM connector used for test.')
     parser.add_argument('-b', '--board', dest='board', type=str, 
                         choices=['bga', 'bga'],
                         default='bga',
                         help='board version. Default: bga')
+    parser.add_argument('-c', '--connector', dest='connector', type=str, 
+                        choices=['J1A', 'J1B', 'J2A', 'J2B', 'J3A', 'J3B', 'J4A', 'J4B'],
+                        default=None,
+                        help='SiPM connector used for test.')
+    parser.add_argument('-r', '--reboot', dest='reboot', action='store_true',
+                        default=False,
+                        help='reboot the Quabo.')
     opts = parser.parse_args()
-    print(os.getcwd())
+
     # Step 1: get the quabo ip
     quabo_ip = Util.read_json(opts.ip_config)
     if quabo_ip == None:
         print('quabo_ip.json is not found.')
         exit(1)
+    
     # Step 2: ping the quabo first
     print('ping quabo: %s'%quabo_ip['ip'])
     status = Util.ping(quabo_ip['ip'])
     if status == False:
         print('Quabo is not reachable.')
         exit(1)
+    
     # Step 3: get the flash uid
     quabo = tftpw(quabo_ip['ip'])
     uid = quabo.get_flashuid()
     if uid == None:
         print('Failed to get the flash uid.')
         exit(1)
+    
     # Step 4: create a logger based on the uid
     logger = Util.create_logger('logs/Quabo-%s.log'%uid)
     logger.info('Start Quabo Auto Test')

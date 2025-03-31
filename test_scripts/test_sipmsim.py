@@ -8,7 +8,7 @@ autotest = SiPMSimTest(boardrev, connector, 'configs/quabo_ip.json')
 
 @pytest.mark.all
 @pytest.mark.mac
-def test_destination_mac():
+def test_mac():
     """"
     Description: 
         Check the destination MAC address
@@ -41,7 +41,7 @@ def test_ph_data():
 @pytest.mark.all
 @pytest.mark.ph
 @pytest.mark.ph_timing
-def test_ph_data_timestamp():
+def test_ph_tming():
     """"
     Description: 
         Check the PH data timestamp
