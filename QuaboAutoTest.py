@@ -2113,7 +2113,7 @@ class QuaboTest(object):
     Description:
         The QuaboTest class is used to test the quabo.
     """    
-    def __init__(self, ip_file='configs/quabo_ip.json', autotest_config_file= 'configs/autotest_config.json', expected_results_file='configs/expected_results.json'):
+    def __init__(self, ip_file='configs/quabo_ip.json', autotest_config_file= 'configs/autotest_config.json', expected_results_file='configs/expected_results.json', logfile='reports_quabo.log'):
         """
         Description:
             The constructor of QuaboTest class.
@@ -2132,7 +2132,8 @@ class QuaboTest(object):
         # get uid
         self.uid = self.client.get_flashuid()
         # create logger
-        self.logger = Util.create_logger('reports/%s/reports_quabo.log'%self.uid, mode='w', tag='QuaboAutoTest')
+        self.logfile = logfile
+        self.logger = Util.create_logger('reports/%s/%s'%(self.uid,self.logfile), mode='w', tag='QuaboAutoTest')
         self.logger.info('Quabo UID - %s'%self.uid)
 
     def CheckResults(self, expected_results, actual_results):
@@ -2411,9 +2412,12 @@ class SiPMSimTest(QuaboTest):
         Inputs:
             - connector(str): the connector of the pixel.
         """
-        super().__init__(ip_file = ip_file, expected_results_file = expected_results_file)
         self.connector = connector
         self.boardver = boardver
+        # we pass this logfile to the QuaboTest class to keep the previous log file existing
+        # and create a new log file for the SiPMSimTest class
+        logfile = 'reports_sipm_%s.log'%self.connector
+        super().__init__(ip_file = ip_file, expected_results_file = expected_results_file, logfile=logfile)
         # create logger
         self.logger = Util.create_logger('reports/%s/reports_sipm_%s.log'%(self.uid, self.connector), mode='w', tag='SiPMSimTest')
         self.logger.info('Quabo UID - %s'%self.uid)
