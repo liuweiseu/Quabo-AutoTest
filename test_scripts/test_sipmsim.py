@@ -29,22 +29,22 @@ def test_ph_peaks():
 
 @pytest.mark.all
 @pytest.mark.ph
-@pytest.mark.ph_data
-def test_ph_data():
+@pytest.mark.ph_pulse_height
+def test_ph_pulse_height():
     """"
     Description: 
-        Check the PH data"
+        Check the pusle height of the PH data."
     """
     result = autotest.CheckPHdata()  
     assert result == True
 
 @pytest.mark.all
 @pytest.mark.ph
-@pytest.mark.ph_timing
-def test_ph_tming():
+@pytest.mark.ph_pulse_rate
+def test_ph_pulse_rate():
     """"
     Description: 
-        Check the PH data timestamp
+        Check the pulse rate of the PH data."
     """
     result = autotest.CheckPHTimestamp()  
     assert result == True

@@ -14,7 +14,7 @@ if __name__ == "__main__":
     parser.add_argument('-m', '--mark', dest='mark', type=str, 
                         default='all',
                         choices=['all', 'hk_vals', 'hk_time', 'maroc_config', 'mac', 'wr_timing',
-                                 'ph', 'ph_data', 'ph_timing', 'ph_peaks', 'ph_pattern'],
+                                 'ph', 'ph_pulse_height', 'ph_pulse_rate', 'ph_peaks', 'ph_pattern'],
                         help='select the test marker.' 
                          'Default: all')
     parser.add_argument('-b', '--board', dest='board', type=str, 
