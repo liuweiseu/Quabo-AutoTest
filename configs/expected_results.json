@@ -51,7 +51,7 @@
             "valid": false
         },
         "rawhvmon": {
-            "val": -70.0,
+            "val": -60.0,
             "deviation": 1.0,
             "valid": true
         },
