@@ -6,3 +6,4 @@ flashuid
 configs/.ipynb_checkpoints/
 reports/*
 **/__pycache__/
+.DS_Store
