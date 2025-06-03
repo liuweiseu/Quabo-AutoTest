@@ -27,6 +27,9 @@ if __name__ == "__main__":
                         help='Stage to start from. Default: gold. '
                         'The valid stages are: gold, silver, wrpc, reboot',)
     opts = parser.parse_args()
+    # create logs dir
+    if not os.path.exists('logs'):
+        os.makedirs('logs')
     # Check if the IP address is valid
     status = Util.ping(opts.ip)
     if status:

@@ -3,3 +3,4 @@ tftpy
 ping3
 netifaces
 numpy
+pytest-html
