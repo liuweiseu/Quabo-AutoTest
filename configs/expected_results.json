@@ -88,7 +88,7 @@
         "i33mon": {
             "val": 0.20,
             "deviation": 0.05,
-            "valid": true
+            "valid": false
         },
         "det_temp": {
             "val": 25,
