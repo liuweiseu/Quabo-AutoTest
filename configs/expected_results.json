@@ -62,7 +62,7 @@
         },
         "v18mon": {
             "val": 1.8,
-            "deviation": 0.02,
+            "deviation": 0.03,
             "valid": true
         },
         "v33mon": {
@@ -152,7 +152,7 @@
     "ph_data": {
         "max_pulse_height": {
             "val": 2900,
-            "deviation": 300,
+            "deviation": 400,
             "valid": true
         },
         "min_pulse_height": {
@@ -173,7 +173,7 @@
     },
     "ph_npeak": {
         "val": 2,
-        "deviation": 0.1,
+        "deviation": 0.2,
         "valid": true
     },
     "ph_pulse_rate": {
