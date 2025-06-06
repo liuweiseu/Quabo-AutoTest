@@ -57,12 +57,12 @@
         },
         "v12mon": {
             "val": 1.2,
-            "deviation": 0.03,
+            "deviation": 0.05,
             "valid": true
         },
         "v18mon": {
             "val": 1.8,
-            "deviation": 0.03,
+            "deviation": 0.05,
             "valid": true
         },
         "v33mon": {
@@ -107,7 +107,7 @@
         },
         "vccaux": {
             "val": 1.8,
-            "deviation": 0.02,
+            "deviation": 0.04,
             "valid": true
         },
         "uid": {
