@@ -10,8 +10,8 @@ if __name__ == "__main__":
                         default='configs/quabo_ip.json',
                         help='IP config file. Default: configs/quabo_ip.json')
     parser.add_argument('-t', '--target', dest='target', type=str, default='quabo',
-                        help='target device(quabo or sipmsim). Default: quabo'),
-                        choices=['quabo', 'sipmsim'],
+                        help='target device(quabo or sipmsim). Default: quabo',
+                        choices=['quabo', 'sipmsim'])
     parser.add_argument('-m', '--mark', dest='mark', type=str, 
                         default='all',
                         choices=['all', 'hk_vals', 'hk_time', 'maroc_config', 'mac', 'wr_timing',
