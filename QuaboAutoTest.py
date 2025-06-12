@@ -2988,6 +2988,10 @@ class AutoDebug(object):
         d = np.load(self.dfile, allow_pickle=True)
         self.data = d['data']
         self.timestamp = d['timestamp']
+        self.maxph = None
+        self.phpkt = None
+        self.ParseData()
+        self.GetMaxPulse()
     
     def ParseData(self, mode='ph'):
         parsed_data = []
@@ -3028,7 +3032,8 @@ class AutoDebug(object):
                 dtype = '<%d%s'%(length/size, flag)
                 sci_data[k] = struct.unpack(dtype, d)[0]
             parsed_data.append(sci_data)
-        return np.array(parsed_data)
+        self.phpkt = np.array(parsed_data)
+        #return np.array(parsed_data)
 
     def FindPixel(self, p, printout=True):
         for i in range(len(PixelOrder)):
@@ -3040,3 +3045,9 @@ class AutoDebug(object):
             print('Maroc Chip: %d; Pixel: %d'%(chip_id, pixel))
         else:
             return chip_id, pixel
+    
+    def GetMaxPulse(self):
+        maxph = []
+        for i in range(len(self.phpkt)):
+            maxph.append(max(self.phpkt[i]['data']))
+        self.maxph = np.array(maxph)
