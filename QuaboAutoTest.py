@@ -325,6 +325,265 @@ DaqPktDef = {
     }
 }
 
+PixelOrder = [
+    24,
+    23,
+    240,
+    136,
+    8,
+    7,
+    241,
+    137,
+    9,
+    21,
+    225,
+    168,
+    25,
+    5,
+    224,
+    169,
+    26,
+    4,
+    208,
+    185,
+    10,
+    20,
+    209,
+    184,
+    11,
+    19,
+    193,
+    200,
+    27,
+    3,
+    192,
+    201,
+    28,
+    18,
+    176,
+    216,
+    12,
+    2,
+    177,
+    217,
+    13,
+    17,
+    161,
+    232,
+    29,
+    16,
+    160,
+    248,
+    30,
+    1,
+    144,
+    233,
+    14,
+    0,
+    145,
+    249,
+    15,
+    55,
+    129,
+    138,
+    31,
+    39,
+    128,
+    139,
+    40,
+    54,
+    243,
+    154,
+    56,
+    37,
+    242,
+    171,
+    57,
+    38,
+    226,
+    155,
+    41,
+    53,
+    227,
+    170,
+    42,
+    67,
+    211,
+    205,
+    58,
+    52,
+    210,
+    186,
+    59,
+    36,
+    194,
+    187,
+    43,
+    35,
+    195,
+    203,
+    44,
+    51,
+    179,
+    202,
+    60,
+    50,
+    178,
+    218,
+    61,
+    49,
+    162,
+    234,
+    45,
+    34,
+    163,
+    219,
+    46,
+    33,
+    147,
+    235,
+    62,
+    48,
+    146,
+    250,
+    63,
+    32,
+    130,
+    251,
+    47,
+    87,
+    131,
+    140,
+    88,
+    22,
+    244,
+    152,
+    72,
+    6,
+    245,
+    153,
+    73,
+    70,
+    229,
+    157,
+    89,
+    86,
+    228,
+    156,
+    90,
+    85,
+    212,
+    172,
+    74,
+    71,
+    213,
+    141,
+    75,
+    83,
+    197,
+    204,
+    91,
+    84,
+    196,
+    188,
+    92,
+    69,
+    180,
+    173,
+    76,
+    68,
+    181,
+    189,
+    77,
+    81,
+    165,
+    236,
+    93,
+    66,
+    164,
+    221,
+    94,
+    82,
+    148,
+    220,
+    78,
+    80,
+    149,
+    252,
+    79,
+    65,
+    133,
+    237,
+    95,
+    64,
+    132,
+    253,
+    104,
+    118,
+    247,
+    158,
+    120,
+    103,
+    246,
+    143,
+    121,
+    119,
+    230,
+    142,
+    105,
+    102,
+    231,
+    174,
+    106,
+    117,
+    215,
+    159,
+    122,
+    101,
+    214,
+    175,
+    123,
+    116,
+    198,
+    190,
+    107,
+    100,
+    199,
+    191,
+    108,
+    99,
+    183,
+    207,
+    124,
+    115,
+    182,
+    206,
+    125,
+    114,
+    166,
+    222,
+    109,
+    97,
+    167,
+    239,
+    110,
+    96,
+    151,
+    255,
+    126,
+    112,
+    150,
+    254,
+    127,
+    98,
+    134,
+    223,
+    111,
+    113,
+    135,
+    238
+]
+
 class Util(object):
     """
     Description:
@@ -2722,3 +2981,62 @@ class SiPMSimTest(QuaboTest):
             self.logger.debug('Actual Pattern: \n%s'%a_pattern)
             self.logger.error('Error: PH pattern check failed.')
             return False
+
+class AutoDebug(object):
+    def __init__(self, dfile):
+        self.dfile = dfile
+        d = np.load(self.dfile, allow_pickle=True)
+        self.data = d['data']
+        self.timestamp = d['timestamp']
+    
+    def ParseData(self, mode='ph'):
+        parsed_data = []
+        for i in range(len(self.data)):
+            if self.data[i] is None:
+                continue
+            data = self.data[i]
+            timestamp = self.timestamp[i]
+            # parse the data here
+            sci_data = {}
+            sci_data['timestamp'] = timestamp
+            for k,v in DaqPktDef.items():
+                # deal with some special cases
+                if k == 'boardloc':
+                    r = struct.unpack('<H', data[0:2])[0]
+                    sci_data[k] = '192.168.%d.%d'%(r>>8, r&0xff)
+                    continue
+                if k == 'data':
+                    offset = v[mode]['offset']
+                    length = v[mode]['length']
+                    flag = DType[v[mode]['type']]['flag']
+                    size = DType[v[mode]['type']]['size']
+                    d = data[offset:offset+length]
+                    dtype = '<%d%s'%(length/size, flag)
+                    r = struct.unpack(dtype, d)
+                    if mode == 'ph':
+                        sci_data[k] = np.array(r, dtype=np.short)
+                    elif mode == 'movie-16bit':
+                        sci_data[k] = np.array(r, dtype=np.ushort)
+                    elif mode == 'movie-8bit':
+                        sci_data[k] = np.array(r, dtype=np.ubyte) 
+                    continue
+                offset = v['offset']
+                length = v['length']
+                flag = DType[v['type']]['flag']
+                size = DType[v['type']]['size']
+                d = data[offset:offset+length]
+                dtype = '<%d%s'%(length/size, flag)
+                sci_data[k] = struct.unpack(dtype, d)[0]
+            parsed_data.append(sci_data)
+        return np.array(parsed_data)
+
+    def FindPixel(self, p, printout=True):
+        for i in range(len(PixelOrder)):
+            if PixelOrder[i] == p:
+                break
+        chip_id = i%4 + 1
+        pixel = int(i/4)
+        if printout == True:
+            print('Maroc Chip: %d; Pixel: %d'%(chip_id, pixel))
+        else:
+            return chip_id, pixel
