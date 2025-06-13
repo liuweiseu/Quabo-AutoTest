@@ -15,6 +15,7 @@ import logging
 import numpy as np
 from datetime import datetime
 import time
+from matplotlib import pyplot as plt
 import netifaces
 
 # The LSBParams describes the map of the code ids to the real settings.
@@ -2990,7 +2991,7 @@ class AutoDebug(object):
             self.data = d['data']
             self.timestamp = d['timestamp']
             self.maxph = None
-            self.phpkt = None
+            self.pkt = None
             self.ParseData()
             self.GetMaxPulse()
     
@@ -3033,7 +3034,7 @@ class AutoDebug(object):
                 dtype = '<%d%s'%(length/size, flag)
                 sci_data[k] = struct.unpack(dtype, d)[0]
             parsed_data.append(sci_data)
-        self.phpkt = np.array(parsed_data)
+        self.pkt = np.array(parsed_data)
         #return np.array(parsed_data)
 
     def FindPixel(self, p, printout=True):
@@ -3049,6 +3050,52 @@ class AutoDebug(object):
     
     def GetMaxPulse(self):
         maxph = []
-        for i in range(len(self.phpkt)):
-            maxph.append(max(self.phpkt[i]['data']))
+        for i in range(len(self.pkt)):
+            maxph.append(max(self.pkt[i]['data']))
         self.maxph = np.array(maxph)
+    
+    def ShowMaxPH(self):
+        try:
+            plt.close(all)
+        except:
+            pass
+        fig = plt.figure()
+        subfig = fig.add_subplot(111)
+        subfig.plot(self.maxph)
+        subfig.set_title('Max Pulse Height')
+        subfig.set_xlabel('Pkt No')
+        subfig.grid(True)
+        plt.show()
+    
+    def ShowPkt(self, pktno=0):
+        if pktno > len(self.pkt) - 1:
+            print('The max pkt no is %d.'%(len(self.pkt) - 1)) 
+            return
+        try:
+            plt.close(all)
+        except:
+            pass
+        print(f"{'Key':<12}{'Vale':<20}")
+        for k,v in self.pkt[pktno].items():
+            if k == 'data':
+                continue
+            else:
+                print(f"{k:<12}{v:<20}")
+        acqmode = self.pkt[pktno]['acq_mode']
+        if acqmode == 1:
+            mode = 'PH'
+        elif acqmode == 2:
+            mode = '16bit-Moive'
+        elif acqmode == 6:
+            mode ='8bit-Moive'
+        else:
+            mode = 'Unknown'
+        fig = plt.figure()
+        subfig = fig.add_subplot(111)
+        subfig.plot(self.pkt[pktno]['data'])
+        subfig.set_title('Pkt No: %d, Mode: %s'%(pktno, mode))
+        subfig.set_xlabel('Pixel No')
+        subfig.grid(True)
+        plt.show()
+        
+        
