@@ -2983,15 +2983,16 @@ class SiPMSimTest(QuaboTest):
             return False
 
 class AutoDebug(object):
-    def __init__(self, dfile):
+    def __init__(self, dfile=None):
         self.dfile = dfile
-        d = np.load(self.dfile, allow_pickle=True)
-        self.data = d['data']
-        self.timestamp = d['timestamp']
-        self.maxph = None
-        self.phpkt = None
-        self.ParseData()
-        self.GetMaxPulse()
+        if dfile is not None:
+            d = np.load(self.dfile, allow_pickle=True)
+            self.data = d['data']
+            self.timestamp = d['timestamp']
+            self.maxph = None
+            self.phpkt = None
+            self.ParseData()
+            self.GetMaxPulse()
     
     def ParseData(self, mode='ph'):
         parsed_data = []
