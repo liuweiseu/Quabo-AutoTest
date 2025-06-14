@@ -12,43 +12,43 @@
         },
         "hvmon0": {
             "val": -55.0,
-            "deviation": 2.0,
+            "deviation": 0.5,
             "valid": true
         },
         "hvmon1": {
             "val": -55.0,
-            "deviation": 2.0,
+            "deviation": 0.5,
             "valid": true
         },
         "hvmon2": {
             "val": -55.0,
-            "deviation": 2.0,
+            "deviation": 0.5,
             "valid": true
         },
         "hvmon3": {
             "val": -55.0,
-            "deviation": 2.0,
+            "deviation": 0.5,
             "valid": true
         },
         "hvimon0": {
             "val": 0.00011,
-            "deviation": 0.00001,
-            "valid": false
+            "deviation": 0.00005,
+            "valid": true
         },
         "hvimon1": {
             "val": 0.00011,
-            "deviation": 0.00001,
-            "valid": false
+            "deviation": 0.00005,
+            "valid": true
         },
         "hvimon2": {
             "val": 0.00011,
-            "deviation": 0.00001,
-            "valid": false
+            "deviation": 0.00005,
+            "valid": true
         },
         "hvimon3": {
             "val": 0.00011,
-            "deviation": 0.00001,
-            "valid": false
+            "deviation": 0.00005,
+            "valid": true
         },
         "rawhvmon": {
             "val": -60.0,
