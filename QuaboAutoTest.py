@@ -15,6 +15,7 @@ import logging
 import numpy as np
 from datetime import datetime
 import time
+from glob import glob
 from matplotlib import pyplot as plt
 import netifaces
 
@@ -2984,18 +2985,130 @@ class SiPMSimTest(QuaboTest):
             return False
 
 class AutoDebug(object):
-    def __init__(self, dfile=None):
-        self.dfile = dfile
-        if dfile is not None:
-            d = np.load(self.dfile, allow_pickle=True)
-            self.data = d['data']
-            self.timestamp = d['timestamp']
-            self.maxph = None
-            self.pkt = None
-            self.ParseData()
-            self.GetMaxPulse()
+    '''
+    Description:
+        This is used for debugging, 
+        reading the raw data recoreded during the auto test.
+    '''
+    def __init__(self, reports_dir=None):
+        '''
+        Description:
+            Create an AutoDebug object based on the reports directory.
+        Inputs:
+            - reports_dir(str): The directory of the reports.
+                Default: None.
+        '''
+        self.reports_dir = reports_dir
+        self.data = None
+        self.timestamp = None
+        self.maxph = None
+        self.pkt = None
     
-    def ParseData(self, mode='ph'):
+    def _ReadSciPkt(self, connector='J1A'):
+        '''
+        Description:
+            Read the science packets from the npz file.
+        Inputs:
+            - connector(str): The data file is taken when the SiPM tester is on this connector.
+                Default: J1A.
+                Options: J1A, J1B, J2A, J2B, J3A, J3B, J4A, J4B.
+        '''
+        try:
+            dfile = glob('%s/sipmsim/*%s*.npz'%(self.reports_dir, connector))[0]
+        except:
+            print("File doesn't exist")
+            return False
+        d = np.load(dfile, allow_pickle=True)
+        self.data = d['data']
+        self.timestamp = d['timestamp']
+        self.ParseSciData()
+        self.GetMaxPulse()
+        return True
+
+    def _ReadHkPkt(self):
+        '''
+        Description:
+            Read the HK packets from the npz file.
+        '''
+        try:
+            dfile = glob('%s/quabo/hk_vals.npz'%(self.reports_dir))[0]
+        except:
+            print("File doesn't exist")
+            return False
+        d = np.load(dfile, allow_pickle=True)
+        self.hkdata = d['data']
+        self.hktimestamp = d['timestamp']
+        self.ParseHkData()
+        return True
+
+    def ParseHkData(self):
+        """
+        Description:
+            parse the housekeeping data.
+        """
+        if self.hkdata is None:
+            return None
+        parsed_data = np.zeros(len(self.hkdata), dtype=object)
+        for i in range(len(self.hkdata)):
+        # parse the housekeeping data here
+            hk_data = {}
+            hk_data['timestamp'] = self.hktimestamp[i]
+            if self.hkdata[i] is None:
+                continue
+            for k, v in HKPktDef.items():
+                offset = v['offset']
+                length = v['length']
+                flag = DType[v['type']]['flag']
+                size = DType[v['type']]['size']
+                dtype = '<%d%s'%(length/size, flag)
+                d = self.hkdata[i][offset:offset+length]
+                # deal with some special cases
+                if k == 'uid' or k == 'fwtime':
+                    r = struct.unpack(dtype, d)[0]
+                    hk_data[k] = r
+                    continue
+                if k == 'fwver':
+                    r = struct.unpack(dtype, d)[0].decode('utf-8')[::-1]
+                    hk_data[k] = r
+                    continue
+                if k == 'boardloc':
+                    r = struct.unpack(dtype, d)[0]
+                    hk_data[k] = '192.168.%d.%d'%(r>>8, r&0xff)
+                    continue
+                # for other cases
+                # not all of the structs have lsb, constant, bit
+                try:
+                    lsb = v['lsb']
+                except:
+                    lsb = 1
+                try:
+                    constant = v['constant']
+                except:
+                    constant = 0
+                try:
+                    bit = v['bit']
+                except:
+                    bit = None
+                # start to parse hk data
+                if length == 1 and bit is None:
+                    hk_data[k] = self.hkdata[i][offset]
+                elif length == 1 and bit is not None:
+                    hk_data[k] = (self.hkdata[i][offset] >> bit) & 0x01
+                else:
+                    r = struct.unpack(dtype, d)[0]
+                    hk_data[k] = r * lsb + constant
+            parsed_data[i] = hk_data
+        self.hkpkt = parsed_data
+    
+    def ParseSciData(self, mode='ph'):
+        '''
+        Description:
+            Parse the packet, converting it from the raw data in bytes to the PANOSETI data format.
+        Inputs:
+            - mode(str): data mode.
+                Default: ph.
+                Options: ph, movie-16bit, movie-8bit.
+        '''
         parsed_data = []
         for i in range(len(self.data)):
             if self.data[i] is None:
@@ -3038,6 +3151,15 @@ class AutoDebug(object):
         #return np.array(parsed_data)
 
     def FindPixel(self, p, printout=True):
+        '''
+        Description:
+            Find the pixel in the packet is connect to which MAROC chip's which pixel.  
+        Inputs:
+            - p(int): The pixel number in the data packet.
+            - printout(bool): print out the info.
+                Default: True.
+                Note: If `printout` is set to False, the chip id and pixel id will be returned.
+        '''
         for i in range(len(PixelOrder)):
             if PixelOrder[i] == p:
                 break
@@ -3048,26 +3170,63 @@ class AutoDebug(object):
         else:
             return chip_id, pixel
     
-    def GetMaxPulse(self):
+    def GetMaxPulse(self, connector='J1A'):
+        '''
+        Description:
+            Get the max pulse heigh in each packet.
+        Inputs:
+            - connector(str): The data file is taken when the SiPM tester is on this connector.
+                Default: J1A.
+                Options: J1A, J1B, J2A, J2B, J3A, J3B, J4A, J4B.
+        '''
         maxph = []
         for i in range(len(self.pkt)):
             maxph.append(max(self.pkt[i]['data']))
         self.maxph = np.array(maxph)
     
-    def ShowMaxPH(self):
+    def ShowMaxPH(self, connector=None):
+        '''
+        Description:
+            Plot the max pulse height.
+        Inputs:
+            - connector(str): The data file is taken when the SiPM tester is on this connector.
+                Options: J1A, J1B, J2A, J2B, J3A, J3B, J4A, J4B.
+        '''
+        if connector == None:
+            print('Please specify the connector.')
+            print('Options: J1A, J1B, J2A, J2B, J3A, J3B, J4A, J4B.')
+            return
+        if not self._ReadSciPkt(connector):
+            return
         try:
             plt.close(all)
         except:
             pass
+        self.GetMaxPulse(connector)
         fig = plt.figure()
         subfig = fig.add_subplot(111)
         subfig.plot(self.maxph)
-        subfig.set_title('Max Pulse Height')
+        subfig.set_title('Max Pulse Height, Connector: %s'%connector)
         subfig.set_xlabel('Pkt No')
         subfig.grid(True)
         plt.show()
     
-    def ShowPkt(self, pktno=0):
+    def ShowPkt(self, connector=None, pktno=0):
+        '''
+        Description:
+            Plot the pkt data.
+        Inputs:
+            - connector(str): The data file is taken when the SiPM tester is on this connector.
+                Options: J1A, J1B, J2A, J2B, J3A, J3B, J4A, J4B.
+            - pktno(int): The packet to be shown.
+                Defalut: 0.
+        '''
+        if connector == None:
+            print('Please specify the connector.')
+            print('Options: J1A, J1B, J2A, J2B, J3A, J3B, J4A, J4B.')
+            return
+        if not self._ReadSciPkt(connector):
+            return
         if pktno > len(self.pkt) - 1:
             print('The max pkt no is %d.'%(len(self.pkt) - 1)) 
             return
@@ -3093,9 +3252,24 @@ class AutoDebug(object):
         fig = plt.figure()
         subfig = fig.add_subplot(111)
         subfig.plot(self.pkt[pktno]['data'])
-        subfig.set_title('Pkt No: %d, Mode: %s'%(pktno, mode))
+        subfig.set_title('Connector: %s, Pkt No: %d, Mode: %s'%(connector, pktno, mode))
         subfig.set_xlabel('Pixel No')
         subfig.grid(True)
         plt.show()
+    
+    def ShowHK(self):
+        '''
+        Description:
+            Show the HK data.
+        '''
+        if not self._ReadHkPkt():
+            return
+        # We only recored one HK packet.
+        # We could record more.
+        hkpkt = self.hkpkt[0]
+        print(f"{'Key':<20}{'Vale':<20}")
+        for k, v in hkpkt.items():
+            print(f"{k:<20}{v:<20}")
+
         
         
