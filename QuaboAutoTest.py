@@ -3240,7 +3240,6 @@ class AutoDebug(object):
                 continue
             else:
                 print(f"{k:<12}{v:<20}")
-        print(f"{'Pulse Pixel':<12}{np.argmax(self.pkt[pktno]['data']):<20}")
         acqmode = self.pkt[pktno]['acq_mode']
         if acqmode == 1:
             mode = 'PH'
