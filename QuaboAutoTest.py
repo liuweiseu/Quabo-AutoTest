@@ -3240,6 +3240,7 @@ class AutoDebug(object):
                 continue
             else:
                 print(f"{k:<12}{v:<20}")
+        print(f"{'Pulse Pixel':<12}{np.argmax(self.pkt[pktno]['data']):<20}")
         acqmode = self.pkt[pktno]['acq_mode']
         if acqmode == 1:
             mode = 'PH'
@@ -3253,6 +3254,9 @@ class AutoDebug(object):
         subfig = fig.add_subplot(111)
         subfig.plot(self.pkt[pktno]['data'])
         subfig.set_title('Connector: %s, Pkt No: %d, Mode: %s'%(connector, pktno, mode))
+        textstr = 'Pulse Pixel: %03d'%(np.argmax(self.pkt[pktno]['data']))
+        props = dict(boxstyle='round', facecolor='wheat', alpha=1)
+        subfig.text(0.25, 0.96, textstr, transform=subfig.transAxes,fontsize=10, verticalalignment='top', horizontalalignment='right',bbox=props)
         subfig.set_xlabel('Pixel No')
         subfig.grid(True)
         plt.show()
