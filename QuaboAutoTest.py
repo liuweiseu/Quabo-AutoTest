@@ -3274,5 +3274,35 @@ class AutoDebug(object):
         for k, v in hkpkt.items():
             print(f"{k:<20}{v:<20}")
 
-        
-        
+    def ShowTimestamps(self, mode='diff'):
+        '''
+        Description:
+            Plot the timestamps
+        Inputs:
+            - mode(str): diff - show the differential timestamp; raw - show the raw timestamps.
+                Defalut: diff.
+        '''
+        timestamps = []
+        for pkt in self.pkt:
+            timestamps.append(pkt['timestamp'])
+        timestamps = np.array(timestamps)
+        try:
+            plt.close(all)
+        except:
+            pass
+        fig = plt.figure()
+        subfig = fig.add_subplot(111)
+        if mode == 'diff':
+            subfig.plot(np.diff(timestamps))
+            subfig.set_title('Difference of Timestamps')
+        elif mode == 'raw':
+            subfig.plot(timestamps)
+            subfig.set_title('Timestamps')
+        else:
+            print('mode invalid.')
+            return
+        subfig.set_xlabel('Pkt No')
+        subfig.set_ylabel('Times/ns')
+        subfig.grid(True)
+        plt.show()
+                
