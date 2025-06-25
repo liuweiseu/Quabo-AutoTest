@@ -31,6 +31,10 @@ if __name__ == "__main__":
                         help='reboot the Quabo.')
     opts = parser.parse_args()
 
+    # create logs dir
+    if not os.path.exists('logs'):
+        os.makedirs('logs')
+        
     # Step 1: get the quabo ip
     quabo_ip = Util.read_json(opts.ip_config)
     if quabo_ip == None:
@@ -52,9 +56,6 @@ if __name__ == "__main__":
         exit(1)
     
     # Step 4: create a logger based on the uid
-    # create logs dir
-    if not os.path.exists('logs'):
-        os.makedirs('logs')
     logger = Util.create_logger('logs/Quabo-%s.log'%uid)
     logger.info('Start Quabo Auto Test')
     logger.info('UID: %s'%uid)
