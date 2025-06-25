@@ -52,6 +52,9 @@ if __name__ == "__main__":
         exit(1)
     
     # Step 4: create a logger based on the uid
+    # create logs dir
+    if not os.path.exists('logs'):
+        os.makedirs('logs')
     logger = Util.create_logger('logs/Quabo-%s.log'%uid)
     logger.info('Start Quabo Auto Test')
     logger.info('UID: %s'%uid)
@@ -74,7 +77,13 @@ if __name__ == "__main__":
     if status == False:
         print('Quabo is not reachable.')
         exit(1)
-    # Step 7: run the tests
+    # Step 7: print out the Dest IPs
+    quabo_config = Util.read_json('configs/quabo_config.json')
+    print('HK   : %s'%quabo_config['dest_ips']['HK'])
+    print('MOIVE: %s'%quabo_config['dest_ips']['MOVIE'])
+    print('PH   : %s'%quabo_config['dest_ips']['PH'])
+    print('Note : The IPs are defined in configs/quabo_config.json')
+    # Step 8: run the tests
     if opts.target == 'quabo':
         pytest.main(["./test_scripts/test_quabo.py", "--html=reports/%s/reports_quabo.html"%uid, "-v", "-m %s"%opts.mark])
     elif opts.target == 'sipmsim':
