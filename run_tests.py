@@ -34,7 +34,7 @@ if __name__ == "__main__":
     # create logs dir
     if not os.path.exists('logs'):
         os.makedirs('logs')
-        
+
     # Step 1: get the quabo ip
     quabo_ip = Util.read_json(opts.ip_config)
     if quabo_ip == None:
@@ -80,10 +80,12 @@ if __name__ == "__main__":
         exit(1)
     # Step 7: print out the Dest IPs
     quabo_config = Util.read_json('configs/quabo_config.json')
+    print('********************* PKT DEST IPs ***********************')
     print('HK   : %s'%quabo_config['dest_ips']['HK'])
     print('MOIVE: %s'%quabo_config['dest_ips']['MOVIE'])
     print('PH   : %s'%quabo_config['dest_ips']['PH'])
     print('Note : The IPs are defined in configs/quabo_config.json')
+    print('**********************************************************')
     # Step 8: run the tests
     if opts.target == 'quabo':
         pytest.main(["./test_scripts/test_quabo.py", "--html=reports/%s/reports_quabo.html"%uid, "-v", "-m %s"%opts.mark])
